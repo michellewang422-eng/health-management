@@ -1,0 +1,126 @@
+/* ============================================================
+   style.css —— 所有页面共用的样式
+   ============================================================ */
+
+/* CSS 变量：颜色只在这里定义一次，改主题色只改这几行 */
+:root {
+  --primary: #2b6cb0;
+  --primary-dark: #234e82;
+  --good: #2f855a;        /* 绿：完成 / 超额（好）*/
+  --warn: #c05621;        /* 橙：提醒 */
+  --bad: #9b2c2c;         /* 红：没做到 */
+  --bg: #f5f7fa;
+  --card: #ffffff;
+  --text: #1a202c;
+  --muted: #5f6b7a;
+  --border: #d9e0e8;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font: 16px/1.6 -apple-system, "PingFang SC", "Microsoft YaHei", "Segoe UI", sans-serif;
+}
+
+/* 居中布局：内容最宽 960px，左右自动留白 */
+.wrap { max-width: 960px; margin: 0 auto; padding: 24px 16px 48px; }
+.narrow { max-width: 440px; }
+
+h1 { font-size: 1.6rem; margin: 0 0 4px; }
+h2 { font-size: 1.15rem; margin: 0 0 12px; }
+.sub { color: var(--muted); margin: 0 0 16px; }
+a { color: var(--primary); }
+
+/* ---- 导航栏：flex 横向排列 ---- */
+#nav { background: var(--card); border-bottom: 1px solid var(--border); }
+.nav-inner {
+  max-width: 960px; margin: 0 auto; padding: 10px 16px;
+  display: flex; align-items: center; gap: 16px; flex-wrap: wrap;
+}
+.brand { font-weight: 700; color: var(--primary); }
+.nav-links { display: flex; gap: 14px; flex: 1; flex-wrap: wrap; }
+.nav-links a { text-decoration: none; color: var(--muted); padding: 2px 0; }
+.nav-links a.active { color: var(--primary); border-bottom: 2px solid var(--primary); }
+.who { color: var(--muted); font-size: 0.95rem; }
+.link-btn {
+  background: none; border: 0; color: var(--primary); cursor: pointer;
+  font: inherit; padding: 0; text-decoration: underline;
+}
+
+/* ---- 卡片 ---- */
+.card {
+  background: var(--card); border: 1px solid var(--border); border-radius: 10px;
+  padding: 20px; margin-bottom: 20px;
+}
+
+/* ---- 表单 ---- */
+.field { margin-bottom: 14px; }
+label { display: block; font-weight: 600; margin-bottom: 4px; font-size: 0.95rem; }
+.opt { font-weight: 400; color: var(--muted); }
+input, select, textarea {
+  width: 100%; padding: 8px 10px; font: inherit;
+  border: 1px solid var(--border); border-radius: 6px; background: #fff;
+}
+input:focus, select:focus, textarea:focus {
+  outline: 2px solid var(--primary); outline-offset: 1px;
+}
+.hint { color: var(--muted); font-size: 0.85rem; margin-top: 2px; }
+
+/* 表单里并排的字段：窄屏自动换行 */
+.row { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 0 16px; }
+
+.btn {
+  background: var(--primary); color: #fff; border: 0; border-radius: 6px;
+  padding: 9px 18px; font: inherit; font-weight: 600; cursor: pointer;
+}
+.btn:hover { background: var(--primary-dark); }
+.btn:disabled { opacity: 0.6; cursor: not-allowed; }
+.btn.block { width: 100%; }
+.btn.danger { background: var(--bad); }
+.btn.ghost { background: transparent; color: var(--primary); border: 1px solid var(--primary); }
+.btn-row { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 8px; }
+
+/* ---- 提示区（错误 / 成功）---- */
+.alert {
+  padding: 10px 14px; border-radius: 6px; margin-bottom: 14px;
+  background: #fff5f5; border: 1px solid #feb2b2; color: var(--bad);
+}
+.alert.ok { background: #f0fff4; border-color: #9ae6b4; color: var(--good); }
+
+/* ---- 徽章：颜色 + 文字一起表达含义（不只靠颜色）---- */
+.badge {
+  display: inline-block; padding: 1px 10px; border-radius: 999px;
+  font-size: 0.85rem; font-weight: 600; white-space: nowrap;
+}
+.badge.good { background: #c6f6d5; color: #22543d; }
+.badge.warn { background: #feebc8; color: #7b341e; }
+.badge.bad  { background: #fed7d7; color: #742a2a; }
+.badge.none { background: #edf2f7; color: var(--muted); }
+
+/* ---- 卡片网格：自动按宽度排成 1~3 列 ---- */
+.grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 16px; }
+.stat { background: #f8fafc; border: 1px solid var(--border); border-radius: 8px; padding: 12px 14px; }
+.stat .label { color: var(--muted); font-size: 0.85rem; }
+.stat .value { font-size: 1.4rem; font-weight: 700; }
+.stat .note { color: var(--muted); font-size: 0.85rem; }
+
+/* ---- 表格：外面套一层可横向滚动的盒子，窄屏时只有表格滚动，整页不滚 ---- */
+.table-wrap { overflow-x: auto; }
+table { border-collapse: collapse; width: 100%; min-width: 640px; }
+th, td { padding: 8px 10px; border-bottom: 1px solid var(--border); text-align: left; white-space: nowrap; }
+th { color: var(--muted); font-weight: 600; font-size: 0.9rem; }
+tbody tr { cursor: pointer; }
+tbody tr:hover { background: #f1f5f9; }
+
+.disclaimer { color: var(--muted); font-size: 0.85rem; margin-top: 12px; }
+.muted { color: var(--muted); }
+
+/* ---- 手机适配 ---- */
+@media (max-width: 640px) {
+  h1 { font-size: 1.35rem; }
+  .card { padding: 16px; }
+  .nav-inner { gap: 10px; }
+}

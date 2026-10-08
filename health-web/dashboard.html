@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>仪表盘 · 健康管理</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <nav id="nav"></nav>
+
+  <main class="wrap">
+    <h1 id="greeting"></h1>
+    <p class="sub">这里是占位页：后面的 PR 会放上参考标准、每日打卡和追踪表。</p>
+  </main>
+
+  <script src="api.js"></script>
+  <script>
+    const user = requireLogin();          // 没登录会跳回 login.html
+    if (user) {
+      renderNav("dashboard.html");
+      // 用 textContent 填入：即使姓名里有 <b>、<script>，也只会当普通文字显示
+      document.getElementById("greeting").textContent = `你好，${fullName(user)}`;
+    }
+  </script>
+</body>
+</html>

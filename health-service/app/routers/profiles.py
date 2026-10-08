@@ -4,6 +4,7 @@ from sqlalchemy.orm import Session
 from app.database import get_db
 from app.models import HealthProfile
 from app.schemas import ProfileCreate, ProfileIn, ProfileOut
+from app.services.standards import build_standards
 from app.services.user_client import UserServiceUnavailable, get_user_checker
 
 # prefix="/profiles"：这个 router 里所有路径都自动加上 /profiles 前缀
@@ -50,6 +51,13 @@ def create_profile(
 @router.get("/{user_id}", response_model=ProfileOut)
 def read_profile(user_id: int, db: Session = Depends(get_db)):
     return get_profile_or_404(db, user_id)
+
+
+# 参考标准不存库：每次读取时用最新的档案现算，改了档案（比如目标）标准自动跟着变
+@router.get("/{user_id}/standards")
+def read_standards(user_id: int, db: Session = Depends(get_db)):
+    profile = get_profile_or_404(db, user_id)
+    return build_standards(profile)
 
 
 # PUT = 整条替换：请求里的每个字段都会写进去

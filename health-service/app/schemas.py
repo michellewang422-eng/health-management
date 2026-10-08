@@ -54,3 +54,45 @@ class ProfileOut(ProfileCreate):
 
     # from_attributes=True：允许直接从 SQLAlchemy 对象的属性读取数据（见 User-management-service 的同名设置）
     model_config = ConfigDict(from_attributes=True)
+
+
+# ---------------- 每日记录 ----------------
+# LogIn：用户每天提交的内容。除运动分钟和强度有默认值外，其它都是选填
+class LogIn(BaseModel):
+    weight_kg: Optional[float] = Field(default=None, ge=30, le=300)
+    exercise_minutes: int = Field(default=0, ge=0, le=600)
+    exercise_intensity: Literal["low", "moderate", "high"] = "moderate"
+    exercise_type: Optional[str] = Field(default=None, max_length=50)
+    calories_in: Optional[int] = Field(default=None, ge=0, le=10000)
+
+
+# 一项指标的打分结果：status 是文字结论，tone 是颜色倾向（前端用它决定徽章颜色）
+class Score(BaseModel):
+    status: Literal["exceeded", "met", "missed"]
+    tone: Literal["good", "warn", "bad"]
+
+
+class Scores(BaseModel):
+    weight: Optional[Score] = None      # 没填体重 = None（不打分）
+    exercise: Optional[Score] = None
+    calories: Optional[Score] = None
+
+
+class Targets(BaseModel):
+    weight_kg: float
+    exercise_effective_minutes: int
+    calories: int
+
+
+# LogOut：返回的一天记录 = 原始数据 + 当天目标 + 打分 + 得分（x/scored）
+class LogOut(BaseModel):
+    log_date: date
+    weight_kg: Optional[float]
+    exercise_minutes: int
+    exercise_intensity: str
+    exercise_type: Optional[str]
+    calories_in: Optional[int]
+    targets: Targets
+    scores: Scores
+    points: int
+    scored: int

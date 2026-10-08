@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.models import HealthProfile
+from app.models import DailyLog, HealthProfile
 from app.schemas import ProfileCreate, ProfileIn, ProfileOut
 from app.services.standards import build_standards
 from app.services.user_client import UserServiceUnavailable, get_user_checker
@@ -77,5 +77,7 @@ def update_profile(user_id: int, payload: ProfileIn, db: Session = Depends(get_d
 @router.delete("/{user_id}", status_code=204)
 def delete_profile(user_id: int, db: Session = Depends(get_db)):
     profile = get_profile_or_404(db, user_id)
+    # 没有数据库外键帮忙级联删除，所以代码自己负责：不能留下"没有主人的日志"
+    db.query(DailyLog).filter(DailyLog.user_id == user_id).delete()
     db.delete(profile)
     db.commit()

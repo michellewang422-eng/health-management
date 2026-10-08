@@ -1,0 +1,158 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>我的档案 · 健康管理</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <nav id="nav"></nav>
+
+  <main class="wrap">
+    <h1>我的档案</h1>
+    <p class="sub">姓名和邮箱保存在用户服务，健康资料保存在健康服务；这里一次编辑，分别保存。</p>
+
+    <div class="card">
+      <div class="alert" id="error" hidden></div>
+      <div class="alert ok" id="success" hidden></div>
+
+      <form id="profile-form">
+        <h2>账号信息</h2>
+        <div class="row">
+          <div class="field">
+            <label for="last">姓 (last name)</label>
+            <input id="last" name="last" type="text" required>
+          </div>
+          <div class="field">
+            <label for="first">名 (first name)</label>
+            <input id="first" name="first" type="text" required>
+          </div>
+        </div>
+        <div class="field">
+          <label for="email">邮箱</label>
+          <input id="email" name="email" type="email" required>
+        </div>
+
+        <div id="health-fields"></div>
+
+        <div class="field" style="max-width:260px">
+          <label for="start_date">周期开始日期</label>
+          <input id="start_date" name="start_date" type="date">
+          <div class="hint">建档当天自动设置；每日目标体重从这一天开始算。</div>
+        </div>
+
+        <div class="btn-row">
+          <button class="btn" type="submit" id="save-btn">保存</button>
+          <button class="btn danger" type="button" id="delete-btn">删除账号</button>
+        </div>
+      </form>
+    </div>
+  </main>
+
+  <script src="api.js"></script>
+  <script src="profile-form.js"></script>
+  <script>
+    const me = requireLogin();
+    renderNav("profile.html");
+    renderHealthFields(document.getElementById("health-fields"));
+
+    const form = document.getElementById("profile-form");
+    const errorBox = document.getElementById("error");
+    const successBox = document.getElementById("success");
+    const saveBtn = document.getElementById("save-btn");
+    const deleteBtn = document.getElementById("delete-btn");
+
+    let loadedUser = null;   // 打开页面时的姓名邮箱，用来判断"有没有改"
+
+    function fillForm(user, profile) {
+      form.last.value = user.last_name;       // 用 .value 赋值：输入框里的内容永远只当文字，不会被当成 HTML
+      form.first.value = user.first_name;
+      form.email.value = user.email;
+      fillHealthFields(form, profile);
+      form.start_date.value = profile.start_date;
+      loadedUser = user;
+    }
+
+    async function load() {
+      try {
+        // 两个请求互不依赖，同时发出去，比一个等一个更快
+        const [user, profile] = await Promise.all([
+          userApi(`/users/${me.id}`),
+          healthApi(`/profiles/${me.id}`),
+        ]);
+        fillForm(user, profile);
+      } catch (e) {
+        showError(errorBox, e.message);
+        saveBtn.disabled = true;
+      }
+    }
+
+    form.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      showError(errorBox, "");
+      showError(successBox, "");
+      saveBtn.disabled = true;
+
+      try {
+        const health = readHealthFields(form);
+        const bpError = checkBloodPressure(health);
+        if (bpError) throw new Error(bpError);
+
+        // 第 1 步：姓名邮箱有变才调用用户服务。PUT 要把三个字段都带上
+        const newUser = {
+          email: form.email.value.trim(),
+          first_name: form.first.value.trim(),
+          last_name: form.last.value.trim(),
+        };
+        const userChanged = newUser.email !== loadedUser.email
+          || newUser.first_name !== loadedUser.first_name
+          || newUser.last_name !== loadedUser.last_name;
+        let savedUser = loadedUser;
+        if (userChanged) {
+          savedUser = await userApi(`/users/${me.id}`, { method: "PUT", body: JSON.stringify(newUser) });
+          localStorage.setItem("currentUser", JSON.stringify(savedUser));   // 导航栏的名字跟着更新
+          renderNav("profile.html");
+        }
+
+        // 第 2 步：健康资料。start_date 留空 = 保持原来的（后端的规则）
+        let savedProfile;
+        try {
+          savedProfile = await healthApi(`/profiles/${me.id}`, {
+            method: "PUT",
+            body: JSON.stringify({ ...health, start_date: form.start_date.value || null }),
+          });
+        } catch (e) {
+          if (userChanged) throw new Error(`姓名邮箱已保存，但健康资料保存失败：${e.message}`);
+          throw e;
+        }
+
+        fillForm(savedUser, savedProfile);
+        showError(successBox, "已保存");
+      } catch (e) {
+        showError(errorBox, e.message);
+      } finally {
+        saveBtn.disabled = false;
+      }
+    });
+
+    deleteBtn.addEventListener("click", async () => {
+      if (!confirm("确定删除吗？删除后所有记录都会消失")) return;
+      showError(errorBox, "");
+      deleteBtn.disabled = true;
+      try {
+        // 顺序不能倒：先删健康档案，再删用户。
+        // 反过来的话，如果删完用户后删档案失败，就会留下"没有主人的档案"
+        await healthApi(`/profiles/${me.id}`, { method: "DELETE" });
+        await userApi(`/users/${me.id}`, { method: "DELETE" });
+        logout();
+      } catch (e) {
+        showError(errorBox, e.message);
+        deleteBtn.disabled = false;
+      }
+    });
+
+    load();
+  </script>
+</body>
+</html>

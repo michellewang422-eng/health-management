@@ -1,6 +1,7 @@
 # Column：声明"表里的一列"；Integer/String/Float/Date/DateTime：这一列存什么类型的数据
 from datetime import date
-from sqlalchemy import Column, Integer, String, Float, Date, DateTime
+# UniqueConstraint：联合唯一约束（多列合起来不能重复）
+from sqlalchemy import Column, Integer, String, Float, Date, DateTime, UniqueConstraint
 # func.now()：让"数据库自己"在写入时填上当前时间（而不是 Python 填）
 from sqlalchemy.sql import func
 
@@ -45,3 +46,23 @@ class HealthProfile(Base):
     # server_default：由数据库填；onupdate：每次 UPDATE 这一行时自动刷新
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+
+# DailyLog ↔ daily_logs 表：用户每天打一次卡，一人一天一行
+class DailyLog(Base):
+    __tablename__ = "daily_logs"
+    # 联合唯一：(user_id, log_date) 合起来不能重复。
+    # user_id 可以重复（一个人有很多天），log_date 也可以重复（很多人同一天），
+    # 但"同一个人的同一天"只能有一行
+    __table_args__ = (UniqueConstraint("user_id", "log_date"),)
+
+    id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, nullable=False, index=True)
+    log_date = Column(Date, nullable=False)
+    weight_kg = Column(Float)                                        # 选填
+    # default 是 SQLAlchemy 在 Python 这边补的；server_default 是写进数据库表结构里的默认值。
+    # 两个都写，这样绕过 Python、直接用 sqlite3 手写 INSERT 时，没写的列也有默认值
+    exercise_minutes = Column(Integer, nullable=False, default=0, server_default="0")
+    exercise_intensity = Column(String, nullable=False, default="moderate", server_default="moderate")
+    exercise_type = Column(String)                                   # 如"快走"，选填
+    calories_in = Column(Integer)                                    # 选填

@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>登录 · 健康管理</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <main class="wrap narrow">
+    <h1>健康管理</h1>
+    <p class="sub">登录后查看你的参考标准、每日打卡和追踪表。</p>
+
+    <div class="card">
+      <h2>登录</h2>
+      <p class="sub">输入注册时用的邮箱即可进入（这一版没有密码）。</p>
+
+      <!-- 失败时 JS 会去掉 hidden 并填入文字；hidden 属性 = 默认不显示 -->
+      <div class="alert" id="error" hidden></div>
+
+      <!-- 用 <form> 包起来有两个好处：
+           1. type="email" required 的浏览器自带校验才会生效（邮箱留空或格式不对，请求根本发不出去）
+           2. 在输入框里按回车也能提交 -->
+      <form id="login-form">
+        <div class="field">
+          <label for="email">邮箱</label>
+          <input id="email" type="email" required placeholder="test@example.com" autocomplete="email">
+        </div>
+        <button class="btn block" type="submit" id="login-btn">登录</button>
+      </form>
+    </div>
+  </main>
+
+  <script src="api.js"></script>
+  <script>
+    // 已经登录过的人直接进仪表盘，不用再看登录页
+    if (getCurrentUser()) location.href = "dashboard.html";
+
+    const form = document.getElementById("login-form");
+    const errorBox = document.getElementById("error");
+    const btn = document.getElementById("login-btn");
+
+    form.addEventListener("submit", async (event) => {
+      event.preventDefault();          // 阻止浏览器默认的"刷新页面式"提交，改由我们用 fetch 发请求
+      showError(errorBox, "");
+      btn.disabled = true;             // 请求期间禁用按钮，防止连点
+
+      try {
+        const email = document.getElementById("email").value.trim();
+        // 后端：POST /auth/login，成功返回完整的用户对象，失败返回 401 + "邮箱未注册"
+        const user = await userApi("/auth/login", {
+          method: "POST",
+          body: JSON.stringify({ email }),
+        });
+        localStorage.setItem("currentUser", JSON.stringify(user));
+        location.href = "dashboard.html";
+      } catch (e) {
+        showError(errorBox, e.message);
+        btn.disabled = false;
+      }
+    });
+  </script>
+</body>
+</html>

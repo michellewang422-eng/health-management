@@ -11,16 +11,269 @@
 
   <main class="wrap">
     <h1 id="greeting"></h1>
-    <p class="sub">这里是占位页：后面的 PR 会放上参考标准、每日打卡和追踪表。</p>
+    <div class="alert" id="page-error" hidden></div>
+
+    <!-- ① 参考标准 -->
+    <section class="card" id="standards-card" hidden>
+      <h2>今日参考标准</h2>
+      <div class="grid" id="standards"></div>
+      <p class="disclaimer" id="disclaimer"></p>
+    </section>
+
+    <!-- ② 每日打卡 -->
+    <section class="card" id="checkin-card" hidden>
+      <h2>每日打卡</h2>
+      <div class="alert" id="form-error" hidden></div>
+      <div class="alert ok" id="form-success" hidden></div>
+
+      <form id="log-form">
+        <div class="row">
+          <div class="field">
+            <label for="log_date">日期</label>
+            <input id="log_date" type="date" required>
+          </div>
+          <div class="field">
+            <label for="weight_kg">体重 (kg) <span class="opt">选填</span></label>
+            <input id="weight_kg" type="number" min="30" max="300" step="any">
+          </div>
+          <div class="field">
+            <label for="exercise_minutes">运动时间 (分钟)</label>
+            <input id="exercise_minutes" type="number" min="0" max="600" step="1" value="0" required>
+          </div>
+          <div class="field">
+            <label for="exercise_intensity">运动强度</label>
+            <select id="exercise_intensity">
+              <option value="low">低强度（如散步）</option>
+              <option value="moderate" selected>中等强度（如快走）</option>
+              <option value="high">高强度（如跑步）</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="exercise_type">运动项目 <span class="opt">选填</span></label>
+            <input id="exercise_type" type="text" maxlength="50" placeholder="如：快走、游泳">
+          </div>
+          <div class="field">
+            <label for="calories_in">摄入热量 (kcal) <span class="opt">选填</span></label>
+            <input id="calories_in" type="number" min="0" max="10000" step="1">
+          </div>
+        </div>
+        <div class="hint">同一天再次保存会覆盖当天的记录。</div>
+        <div class="btn-row">
+          <button class="btn" type="submit" id="save-btn">保存</button>
+        </div>
+      </form>
+    </section>
+
+    <!-- ③ 追踪表 -->
+    <section class="card" id="table-card" hidden>
+      <h2>追踪表</h2>
+      <p class="sub">点击某一行可以把数据填回上面的表单修改。徽章：<span class="badge good">完成 / 超额</span>
+        <span class="badge warn">提醒（如热量超标）</span> <span class="badge bad">未完成</span>；得分 = 绿色徽章数 / 已填项数。</p>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>日期</th><th>体重 (kg)</th><th>运动</th><th>热量 (kcal)</th>
+              <th>体重</th><th>运动</th><th>热量</th><th>得分</th><th></th>
+            </tr>
+          </thead>
+          <tbody id="log-rows"></tbody>
+        </table>
+      </div>
+      <p class="muted" id="empty-hint" hidden>还没有记录，先在上面打第一天的卡吧。</p>
+    </section>
   </main>
 
   <script src="api.js"></script>
   <script>
-    const user = requireLogin();          // 没登录会跳回 login.html
-    if (user) {
-      renderNav("dashboard.html");
-      // 用 textContent 填入：即使姓名里有 <b>、<script>，也只会当普通文字显示
-      document.getElementById("greeting").textContent = `你好，${fullName(user)}`;
+    const me = requireLogin();
+    renderNav("dashboard.html");
+
+    // ---------- 文字映射：后端返回英文代码，页面显示中文 ----------
+    const STATUS_TEXT = { exceeded: "超额", met: "完成", missed: "未完成" };
+    const INTENSITY_TEXT = { low: "低强度", moderate: "中等", high: "高强度" };
+    const BMI_TEXT = { underweight: "偏瘦", normal: "正常", overweight: "超重", obese: "肥胖" };
+    // 原始指标评估：[中文, 徽章颜色]
+    const ASSESS = {
+      glucose: { normal: ["正常", "good"], elevated: ["偏高", "warn"], high: ["高，建议就医确认", "bad"] },
+      blood_pressure: { normal: ["正常", "good"], elevated: ["偏高", "warn"], stage1: ["一期高血压范围", "warn"],
+                        stage2: ["二期高血压范围", "bad"], crisis: ["危急，请立即就医", "bad"] },
+      cholesterol: { ideal: ["理想", "good"], borderline: ["边缘偏高", "warn"], high: ["高", "bad"] },
+    };
+
+    // ---------- 页面元素 ----------
+    const $ = id => document.getElementById(id);
+    const pageError = $("page-error");
+    const formError = $("form-error");
+    const formSuccess = $("form-success");
+    const form = $("log-form");
+    let logsByDate = new Map();      // 日期 -> 这一天的记录，点击表格行时用来回填表单
+
+    // 本地日期 YYYY-MM-DD（不用 toISOString：它按 UTC 算，在中国晚上 8 点后会变成"明天"或"昨天"）
+    function todayStr() {
+      const d = new Date();
+      const pad = n => String(n).padStart(2, "0");
+      return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+    }
+
+    // ---------- 渲染：徽章 ----------
+    // 徽章里一定有文字，不能只靠颜色：色盲的用户也要能看懂
+    function badge(score) {
+      if (!score) return '<span class="badge none">—</span>';
+      return `<span class="badge ${score.tone}">${STATUS_TEXT[score.status]}</span>`;
+    }
+
+    function assessBadge(kind, status) {
+      if (!status) return "";
+      const [text, tone] = ASSESS[kind][status];
+      return ` <span class="badge ${tone}">${esc(text)}</span>`;
+    }
+
+    // ---------- 渲染：参考标准 ----------
+    function renderStandards(s) {
+      const a = s.baseline_assessment;
+      const r = s.reference_ranges;
+      const stat = (label, value, note = "") =>
+        `<div class="stat"><div class="label">${esc(label)}</div><div class="value">${value}</div>` +
+        (note ? `<div class="note">${note}</div>` : "") + `</div>`;
+
+      $("standards").innerHTML = [
+        stat("每日热量", `${s.daily_calories} kcal`, `基础代谢 ${s.bmr} kcal；每周体重变化 ${s.weekly_weight_change_kg} kg`),
+        stat("每日运动", `${s.exercise.daily_effective_minutes} 分钟`,
+             `折算成中等强度；推荐：${s.exercise.suggested.map(esc).join("、")}`),
+        // toFixed(1)：JavaScript 会把 22.0 显示成 22，要固定保留 1 位小数
+        stat("BMI", `${s.bmi.toFixed(1)} ${esc(BMI_TEXT[s.bmi_category])}`,
+             `健康体重范围 ${s.healthy_weight_kg[0]}–${s.healthy_weight_kg[1]} kg`),
+        stat("空腹血糖", `${esc(r.fasting_glucose_mgdl)} mg/dL`, assessBadge("glucose", a.glucose)),
+        stat("血压", `${esc(r.blood_pressure_mmhg)} mmHg`, assessBadge("blood_pressure", a.blood_pressure)),
+        stat("总胆固醇", `${esc(r.total_cholesterol_mgdl)} mg/dL`,
+             assessBadge("cholesterol", a.cholesterol) +
+             `<br>HDL ${esc(r.hdl_mgdl)}；LDL ${esc(r.ldl_mgdl)}；甘油三酯 ${esc(r.triglycerides_mgdl)}`),
+      ].join("");
+
+      $("disclaimer").textContent =
+        `${s.disclaimer}血糖、血压、总胆固醇的标准不按年龄性别分组；热量、运动建议、健康体重范围和 HDL 才与年龄性别有关。`;
+    }
+
+    // ---------- 渲染：追踪表 ----------
+    // 用户输入的内容（日期、运动项目）一律过 esc()，防止有人在"运动项目"里写 <script>
+    function rowHtml(log) {
+      const type = log.exercise_type ? ` · ${esc(log.exercise_type)}` : "";
+      const t = log.targets;
+      return `<tr data-date="${esc(log.log_date)}">
+        <td>${esc(log.log_date)}</td>
+        <td title="今日期望体重 ${t.weight_kg} kg">${log.weight_kg ?? "—"}</td>
+        <td>${log.exercise_minutes} 分钟（${INTENSITY_TEXT[log.exercise_intensity]}）${type}</td>
+        <td title="今日目标 ${t.calories} kcal">${log.calories_in ?? "—"}</td>
+        <td>${badge(log.scores.weight)}</td>
+        <td>${badge(log.scores.exercise)}</td>
+        <td>${badge(log.scores.calories)}</td>
+        <td>${log.points}/${log.scored}</td>
+        <td><button type="button" class="link-btn del">删除</button></td>
+      </tr>`;
+    }
+
+    function renderLogs(logs) {
+      logsByDate = new Map(logs.map(l => [l.log_date, l]));
+      // 最新的日期放最上面，看起来更顺手
+      $("log-rows").innerHTML = [...logs].reverse().map(rowHtml).join("");
+      $("empty-hint").hidden = logs.length > 0;
+    }
+
+    // ---------- 加载数据 ----------
+    async function loadLogs() {
+      renderLogs(await healthApi(`/profiles/${me.id}/logs`));
+    }
+
+    async function load() {
+      try {
+        // 标准和记录互不依赖，同时请求
+        const [standards, logs] = await Promise.all([
+          healthApi(`/profiles/${me.id}/standards`),
+          healthApi(`/profiles/${me.id}/logs`),
+        ]);
+        renderStandards(standards);
+        renderLogs(logs);
+        for (const id of ["standards-card", "checkin-card", "table-card"]) $(id).hidden = false;
+      } catch (e) {
+        showError(pageError, e.message);
+      }
+    }
+
+    // ---------- 表单 ----------
+    function setDefaults() {
+      $("log_date").value = todayStr();
+      $("log_date").max = todayStr();      // 日期选择器不让选未来（服务端也会拦）
+      // 从卡路里计算器跳过来时（?calories=1234）自动带入热量
+      const fromCalc = new URLSearchParams(location.search).get("calories");
+      if (fromCalc) $("calories_in").value = fromCalc;
+    }
+
+    function fillForm(log) {
+      $("log_date").value = log.log_date;
+      $("weight_kg").value = log.weight_kg ?? "";
+      $("exercise_minutes").value = log.exercise_minutes;
+      $("exercise_intensity").value = log.exercise_intensity;
+      $("exercise_type").value = log.exercise_type ?? "";
+      $("calories_in").value = log.calories_in ?? "";
+      window.scrollTo({ top: $("checkin-card").offsetTop - 60, behavior: "smooth" });
+    }
+
+    form.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      showError(formError, "");
+      showError(formSuccess, "");
+      $("save-btn").disabled = true;
+      try {
+        const date = $("log_date").value;
+        await healthApi(`/profiles/${me.id}/logs/${date}`, {
+          method: "PUT",
+          body: JSON.stringify({
+            weight_kg: num($("weight_kg").value),
+            exercise_minutes: num($("exercise_minutes").value) ?? 0,
+            exercise_intensity: $("exercise_intensity").value,
+            exercise_type: $("exercise_type").value.trim() || null,
+            calories_in: num($("calories_in").value),
+          }),
+        });
+        await loadLogs();                    // 保存后重新读，表里立刻出现新行 / 更新的行
+        showError(formSuccess, `已保存 ${date} 的记录`);
+      } catch (e) {
+        showError(formError, e.message);
+      } finally {
+        $("save-btn").disabled = false;
+      }
+    });
+
+    // 事件委托：不给每一行都绑监听器，只在 tbody 上绑一个，再看点到的是哪里。
+    // 好处是表格每次重新渲染后，不用重新绑定
+    $("log-rows").addEventListener("click", async (event) => {
+      const row = event.target.closest("tr");
+      if (!row) return;
+      const date = row.dataset.date;
+      if (event.target.closest("button.del")) {
+        if (!confirm(`确定删除 ${date} 的记录吗？`)) return;
+        try {
+          await healthApi(`/profiles/${me.id}/logs/${date}`, { method: "DELETE" });
+          await loadLogs();
+        } catch (e) {
+          showError(formError, e.message);
+        }
+        return;
+      }
+      fillForm(logsByDate.get(date));
+    });
+
+    // 表单里的 num() 来自 profile-form.js 的同名工具，这里单独定义一份，避免多引一个无关文件
+    function num(v) { return v === "" || v == null ? null : Number(v); }
+
+    // ---------- 启动 ----------
+    // 用 textContent 填姓名：即使姓名里有 <b>、<script>，也只会当普通文字显示
+    // 没登录时 requireLogin() 已经安排了跳转，这里就不再往下执行（me 是 null）
+    if (me) {
+      $("greeting").textContent = `你好，${fullName(me)}`;
+      setDefaults();
+      load();
     }
   </script>
 </body>

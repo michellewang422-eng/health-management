@@ -2,6 +2,15 @@ from fastapi import FastAPI
 # CORSMiddleware：控制"允许哪些来源的网页调用这个后端"
 from fastapi.middleware.cors import CORSMiddleware
 
+# Base：总登记处；engine：数据库连接引擎，两者都在 database.py 里定义好
+from app.database import Base, engine
+# 必须导入 models，Python 才会真正"读到" HealthProfile 类的定义，Base 才知道要建 health_profiles 这张表
+from app import models  # noqa: F401
+
+# 启动时检查：如果 Base 登记名单里的表在数据库里还不存在，就建出来。
+# 已存在的表不会被重复建、不会清空数据（也不会修改已有表的结构）
+Base.metadata.create_all(bind=engine)
+
 # title 会显示在自动生成的文档页 /docs 顶部
 app = FastAPI(title="health-service")
 
@@ -9,7 +18,7 @@ app = FastAPI(title="health-service")
 # "源" = 协议 + 域名 + 端口，三者完全一样才算同源。
 # 我们的网页将从 http://127.0.0.1:8777 打开，后端在 http://127.0.0.1:8001，
 # 端口不同就是不同源，浏览器默认禁止网页读取另一个源的响应。
-# 下面这份白名单和 user-service 保持一致，这样同一个网页能同时调用两个后端。
+# 下面这份白名单和 User-management-service 保持一致，这样同一个网页能同时调用两个后端。
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[

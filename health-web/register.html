@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>注册 · 健康管理</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <main class="wrap">
+    <h1>注册</h1>
+    <p class="sub">创建账号并建立你的健康档案。姓名和邮箱保存在用户服务里，健康资料保存在健康服务里。</p>
+
+    <div class="card">
+      <div class="alert" id="error" hidden></div>
+
+      <form id="register-form">
+        <h2>账号信息（必填）</h2>
+        <div class="row">
+          <div class="field">
+            <label for="last">姓 (last name)</label>
+            <input id="last" name="last" type="text" required>
+          </div>
+          <div class="field">
+            <label for="first">名 (first name)</label>
+            <input id="first" name="first" type="text" required>
+          </div>
+        </div>
+        <div class="field">
+          <label for="email">邮箱</label>
+          <input id="email" name="email" type="email" required autocomplete="email">
+        </div>
+
+        <div id="health-fields"></div>
+
+        <div class="btn-row">
+          <button class="btn" type="submit" id="submit-btn">注册</button>
+          <a href="login.html" class="btn ghost" style="text-decoration:none">已有账号，去登录</a>
+        </div>
+      </form>
+    </div>
+  </main>
+
+  <script src="api.js"></script>
+  <script src="profile-form.js"></script>
+  <script>
+    renderHealthFields(document.getElementById("health-fields"));
+
+    const form = document.getElementById("register-form");
+    const errorBox = document.getElementById("error");
+    const btn = document.getElementById("submit-btn");
+
+    // 注册是"两步操作"：先在用户服务建 user，再在健康服务建 profile。
+    // 两个服务是两个独立的数据库，没有"事务"能让它们一起成功或一起失败，
+    // 所以第 2 步失败时，要由我们自己把第 1 步建的 user 删掉（"补偿"），
+    // 否则会留下"邮箱已被占用、却没有档案"的半成品账号。
+    async function onRegister() {
+      const health = readHealthFields(form);
+      const bpError = checkBloodPressure(health);
+      if (bpError) throw new Error(bpError);
+
+      const user = await userApi("/users", {
+        method: "POST",
+        body: JSON.stringify({
+          email: form.email.value.trim(),
+          first_name: form.first.value.trim(),
+          last_name: form.last.value.trim(),
+        }),
+      });
+
+      try {
+        await healthApi("/profiles", {
+          method: "POST",
+          body: JSON.stringify({ user_id: user.id, ...health }),
+        });
+      } catch (e) {
+        // 补偿：撤销第 1 步。这一步自己也可能失败（比如用户服务刚好也挂了），失败了就如实告诉用户
+        try {
+          await userApi(`/users/${user.id}`, { method: "DELETE" });
+        } catch (undoError) {
+          throw new Error(`${e.message}（并且撤销账号失败，请联系管理员删除邮箱 ${user.email}）`);
+        }
+        throw e;
+      }
+
+      localStorage.setItem("currentUser", JSON.stringify(user));
+      location.href = "dashboard.html";
+    }
+
+    form.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      showError(errorBox, "");
+      btn.disabled = true;
+      try {
+        await onRegister();
+      } catch (e) {
+        showError(errorBox, e.message);
+        btn.disabled = false;
+        window.scrollTo({ top: 0, behavior: "smooth" });
+      }
+    });
+  </script>
+</body>
+</html>

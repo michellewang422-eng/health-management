@@ -7,7 +7,7 @@ from app.database import Base, engine
 # 必须导入 models，Python 才会真正"读到" HealthProfile / DailyLog 类的定义，Base 才知道要建这两张表
 from app import models  # noqa: F401
 # 导入 app/routers/ 里定义好的路由文件：profiles（健康档案的增查改删）、logs（每日打卡）
-from app.routers import logs, profiles
+from app.routers import logs, profiles, report
 
 # 启动时检查：如果 Base 登记名单里的表在数据库里还不存在，就建出来。
 # 已存在的表不会被重复建、不会清空数据（也不会修改已有表的结构）
@@ -36,6 +36,7 @@ app.add_middleware(
 # 把 router 正式"挂载"到主应用上；之后路由越来越多，只需要不断 include_router
 app.include_router(profiles.router)
 app.include_router(logs.router)
+app.include_router(report.router)
 
 
 # @app.get("/health")：把下面这个函数登记成"收到 GET /health 请求时执行的代码"

@@ -76,6 +76,7 @@ function fullName(user) {
 // 导航栏：写在这一个地方，所有页面共用，加新页面只改这里。
 const NAV_ITEMS = [
   { href: "dashboard.html", label: "仪表盘" },
+  { href: "report.html", label: "周期报告" },
   { href: "profile.html", label: "我的档案" },
 ];
 

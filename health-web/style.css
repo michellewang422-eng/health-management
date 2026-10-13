@@ -128,3 +128,7 @@ tbody tr:hover { background: #f1f5f9; }
 /* 参考标准里的小字依据（带链接） */
 .evidence { display: block; margin-top: 4px; color: var(--muted); font-size: 0.75rem; line-height: 1.4; }
 .evidence a { color: inherit; text-decoration: underline; }
+
+/* 周期报告 */
+.status-bar { background: #ebf8ff; border-radius: 8px; padding: 10px 14px; margin: 0 0 16px; }
+.chart-box { position: relative; height: 260px; margin-bottom: 20px; }

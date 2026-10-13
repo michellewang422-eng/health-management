@@ -181,3 +181,52 @@ class LogAPITestCase(DBTestCase):
         self.assertEqual(row.exercise_minutes, 0)
         self.assertEqual(row.exercise_intensity, "moderate")
         db.close()
+
+
+class SleepLogAPITestCase(LogAPITestCase):
+    # ---- T85-13 计划书的 3 天数据各加睡眠 5.5 / 7.5 / 9.5 ----
+    def test_three_day_scenario_with_sleep(self):
+        self.add_profile()
+        d0, d1, d2 = TODAY - timedelta(days=2), TODAY - timedelta(days=1), TODAY
+        r0 = self.put_log(d0, weight_kg=60.0, exercise_minutes=50, calories_in=1300,
+                          sleep_hours=5.5).json()
+        r1 = self.put_log(d1, weight_kg=60.2, exercise_minutes=60, exercise_intensity="high",
+                          calories_in=1500, sleep_hours=7.5).json()
+        r2 = self.put_log(d2, weight_kg=59.2, exercise_minutes=20, exercise_intensity="low",
+                          calories_in=1100, sleep_hours=9.5).json()
+        self.assertEqual([r["points"] for r in (r0, r1, r2)], [3, 3, 1])
+        self.assertEqual([r["scored"] for r in (r0, r1, r2)], [4, 4, 4])
+        self.assertEqual(r0["scores"]["sleep"], {"status": "missed", "tone": "bad"})
+        self.assertEqual(r1["scores"]["sleep"], {"status": "met", "tone": "good"})
+        self.assertEqual(r2["scores"]["sleep"], {"status": "exceeded", "tone": "warn"})
+
+    # ---- T85-10 范围 0–24 ----
+    def test_sleep_range_validation(self):
+        self.add_profile()
+        for hours, expected in [(-1, 422), (0, 200), (24, 200), (24.5, 422)]:
+            with self.subTest(hours=hours):
+                self.assertEqual(self.put_log(TODAY, sleep_hours=hours).status_code, expected)
+
+    def test_sleep_can_be_cleared_by_overwriting(self):
+        self.add_profile()
+        self.put_log(TODAY, sleep_hours=7.5)
+        body = self.put_log(TODAY, exercise_minutes=30).json()
+        self.assertIsNone(body["sleep_hours"])
+        self.assertIsNone(body["scores"]["sleep"])
+
+    # ---- T85-14 派生不存库：年龄跨过 65 岁，上限从 9 变成 8 ----
+    def test_sleep_score_recomputed_when_age_changes(self):
+        self.add_profile(age=64)
+        self.put_log(TODAY, sleep_hours=8.5)
+        before = self.client.get("/profiles/1/logs").json()[0]
+        self.assertEqual(before["scores"]["sleep"]["status"], "met")
+
+        profile = self.client.get("/profiles/1").json()
+        update = {k: v for k, v in profile.items()
+                  if k not in ("id", "user_id", "created_at", "updated_at")}
+        update["age"] = 65
+        self.assertEqual(self.client.put("/profiles/1", json=update).status_code, 200)
+
+        after = self.client.get("/profiles/1/logs").json()[0]
+        self.assertEqual(after["scores"]["sleep"]["status"], "exceeded")
+        self.assertEqual(after["targets"]["sleep_hours"]["max"], 8)

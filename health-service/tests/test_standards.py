@@ -17,11 +17,13 @@ from app.services.standards import (
     classify_bmi,
     classify_cholesterol,
     classify_glucose,
+    classify_sleep,
     daily_calories,
     daily_exercise_minutes,
     effective_minutes,
     hdl_reference,
     healthy_weight_range,
+    sleep_range,
     suggested_exercises,
 )
 from tests._support import DBTestCase, TestingSessionLocal
@@ -153,14 +155,15 @@ class BuildStandardsTestCase(unittest.TestCase):
     def test_no_baseline_gives_none_assessments(self):
         s = build_standards(make_profile())
         self.assertEqual(s["baseline_assessment"],
-                         {"glucose": None, "blood_pressure": None, "cholesterol": None})
+                         {"glucose": None, "blood_pressure": None, "cholesterol": None, "sleep": None})
 
     def test_baseline_assessment_when_provided(self):
         s = build_standards(make_profile(
             baseline_glucose_mgdl=110, baseline_cholesterol_mgdl=205,
             baseline_systolic=135, baseline_diastolic=85))
         self.assertEqual(s["baseline_assessment"],
-                         {"glucose": "elevated", "blood_pressure": "stage1", "cholesterol": "borderline"})
+                         {"glucose": "elevated", "blood_pressure": "stage1", "cholesterol": "borderline",
+                          "sleep": None})
 
     def test_blood_pressure_needs_both_numbers(self):
         # 只有一半血压数据时不评估（接口层已经拦住了这种数据，这里是防御）
@@ -197,3 +200,33 @@ class StandardsAPITestCase(DBTestCase):
         self.assertEqual(body["daily_calories"], 1280)
         self.assertEqual(body["exercise"]["daily_effective_minutes"], 45)
         self.assertEqual(body["weekly_weight_change_kg"], -0.5)
+
+
+class SleepStandardsTestCase(unittest.TestCase):
+    # ---- T85-1 参考睡眠区间随年龄变 ----
+    def test_sleep_range_by_age(self):
+        self.assertEqual(sleep_range(25), (7, 9))
+        self.assertEqual(sleep_range(64), (7, 9))
+        self.assertEqual(sleep_range(65), (7, 8))
+
+    # ---- T85-5 基线评估边界 ----
+    def test_classify_sleep_boundaries(self):
+        for hours, expected in [(6.9, "short"), (7.0, "normal"), (9.0, "normal"), (9.5, "long")]:
+            with self.subTest(hours=hours):
+                self.assertEqual(classify_sleep(hours, 35), expected)
+
+    def test_classify_sleep_none_when_not_filled(self):
+        self.assertIsNone(classify_sleep(None, 35))
+
+    def test_build_standards_contains_sleep_with_sources(self):
+        s = build_standards(make_profile(sleep_hours=5.5))
+        self.assertEqual((s["sleep"]["min_hours"], s["sleep"]["max_hours"]), (7, 9))
+        self.assertEqual(s["baseline_assessment"]["sleep"], "short")
+        self.assertGreaterEqual(len(s["sleep"]["sources"]), 2)
+        for src in s["sleep"]["sources"]:
+            self.assertTrue(src["url"].startswith("https://"))
+            self.assertTrue(src["name"])
+
+    def test_sleep_range_in_standards_follows_age(self):
+        s = build_standards(make_profile(age=70))
+        self.assertEqual((s["sleep"]["min_hours"], s["sleep"]["max_hours"]), (7, 8))

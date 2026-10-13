@@ -124,3 +124,7 @@ tbody tr:hover { background: #f1f5f9; }
   .card { padding: 16px; }
   .nav-inner { gap: 10px; }
 }
+
+/* 参考标准里的小字依据（带链接） */
+.evidence { display: block; margin-top: 4px; color: var(--muted); font-size: 0.75rem; line-height: 1.4; }
+.evidence a { color: inherit; text-decoration: underline; }

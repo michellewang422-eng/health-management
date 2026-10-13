@@ -138,3 +138,6 @@ tbody tr:hover { background: #f1f5f9; }
 .warn-box { background: #fffbeb; border-color: #f6e05e; color: #744210; }
 .total { font-size: 1.1rem; margin: 12px 0; }
 .total strong { font-size: 1.6rem; }
+
+/* 每页底部的免责声明 */
+.site-footer { text-align: center; color: var(--muted); font-size: 0.85rem; padding: 24px 16px; }

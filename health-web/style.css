@@ -132,3 +132,9 @@ tbody tr:hover { background: #f1f5f9; }
 /* 周期报告 */
 .status-bar { background: #ebf8ff; border-radius: 8px; padding: 10px 14px; margin: 0 0 16px; }
 .chart-box { position: relative; height: 260px; margin-bottom: 20px; }
+
+/* 卡路里计算器 */
+.calc-row { align-items: end; }
+.warn-box { background: #fffbeb; border-color: #f6e05e; color: #744210; }
+.total { font-size: 1.1rem; margin: 12px 0; }
+.total strong { font-size: 1.6rem; }

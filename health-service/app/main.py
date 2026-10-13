@@ -1,20 +1,35 @@
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI
 # CORSMiddleware：控制"允许哪些来源的网页调用这个后端"
 from fastapi.middleware.cors import CORSMiddleware
 
 # Base：总登记处；engine：数据库连接引擎，两者都在 database.py 里定义好
-from app.database import Base, engine
+from app.database import Base, SessionLocal, engine
+from app.seed_foods import seed
 # 必须导入 models，Python 才会真正"读到" HealthProfile / DailyLog 类的定义，Base 才知道要建这两张表
 from app import models  # noqa: F401
 # 导入 app/routers/ 里定义好的路由文件：profiles（健康档案的增查改删）、logs（每日打卡）
-from app.routers import logs, profiles, report
+from app.routers import calories, logs, profiles, report
 
 # 启动时检查：如果 Base 登记名单里的表在数据库里还不存在，就建出来。
 # 已存在的表不会被重复建、不会清空数据（也不会修改已有表的结构）
 Base.metadata.create_all(bind=engine)
 
 # title 会显示在自动生成的文档页 /docs 顶部
-app = FastAPI(title="health-service")
+# lifespan：server 启动时执行一次。种子数据放在这里（不是 import 时），
+# 这样测试里直接 import app 不会去改开发用的 health.db
+@asynccontextmanager
+async def lifespan(_app):
+    db = SessionLocal()
+    try:
+        seed(db)
+    finally:
+        db.close()
+    yield
+
+
+app = FastAPI(title="health-service", lifespan=lifespan)
 
 # ---- CORS ----
 # "源" = 协议 + 域名 + 端口，三者完全一样才算同源。
@@ -37,6 +52,7 @@ app.add_middleware(
 app.include_router(profiles.router)
 app.include_router(logs.router)
 app.include_router(report.router)
+app.include_router(calories.router)
 
 
 # @app.get("/health")：把下面这个函数登记成"收到 GET /health 请求时执行的代码"

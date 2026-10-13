@@ -24,7 +24,7 @@ from sqlalchemy.pool import StaticPool
 from app.database import Base, get_db
 from app.main import app
 # 必须导入模型，Base 才知道有哪些表，下面 create_all 才建得出来
-from app.models import DailyLog, HealthProfile  # noqa: F401
+from app.models import DailyLog, FoodItem, HealthProfile  # noqa: F401
 
 
 engine = create_engine(

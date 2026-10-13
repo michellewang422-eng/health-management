@@ -1,6 +1,6 @@
 from datetime import date, datetime
 # Literal["a", "b"]：这个字段只能是列出来的几个值之一
-from typing import Literal, Optional
+from typing import List, Literal, Optional
 
 # Field(ge=, le=)：限制数字范围（ge = 大于等于，le = 小于等于）
 # model_validator：校验"多个字段之间的关系"（单个字段的 Field 做不到）
@@ -106,3 +106,22 @@ class LogOut(BaseModel):
     scores: Scores
     points: int
     scored: int
+
+
+# ---------------- 卡路里计算器 ----------------
+class FoodOut(BaseModel):
+    name: str
+    aliases: str
+    kcal_per_100g: float
+    source: str
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class CalcItem(BaseModel):
+    name: str = Field(min_length=1, max_length=50)
+    grams: float = Field(gt=0, le=5000)
+
+
+class CalculateIn(BaseModel):
+    items: List[CalcItem] = Field(min_length=1, max_length=50)

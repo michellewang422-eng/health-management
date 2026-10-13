@@ -77,6 +77,7 @@ function fullName(user) {
 const NAV_ITEMS = [
   { href: "dashboard.html", label: "仪表盘" },
   { href: "report.html", label: "周期报告" },
+  { href: "calories.html", label: "卡路里计算器" },
   { href: "profile.html", label: "我的档案" },
 ];
 

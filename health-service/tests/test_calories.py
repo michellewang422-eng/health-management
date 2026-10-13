@@ -110,7 +110,7 @@ class CaloriesAPITestCase(DBTestCase):
 
     # 通用词有多个候选：不默认，返回选项让用户选，也不计入总数
     def test_generic_words_return_options(self):
-        for word, options in [("鸡肉", ["鸡胸肉（熟）", "鸡腿肉（熟）"]),
+        for word, options in [("鸡肉", ["鸡胸肉（熟）", "鸡腿肉（熟）", "鸡翅（烤）"]),
                               ("猪肉", ["猪里脊（熟）", "猪五花肉（熟）"]),
                               ("鱼", ["三文鱼（熟）", "鳕鱼（熟）"])]:
             with self.subTest(word=word):
@@ -121,6 +121,13 @@ class CaloriesAPITestCase(DBTestCase):
                 amb = body["ambiguous"][0]
                 self.assertEqual((amb["index"], amb["input"]), (1, word))
                 self.assertEqual([o["name"] for o in amb["options"]], options)
+
+    # 新增的三种食物：热量 = 克数 ÷ 100 × 每 100 g 千卡（手算：150 g 薯条 = 1.5 × 312 = 468）
+    def test_wings_fried_chicken_and_fries(self):
+        for name, grams, kcal in [("鸡翅", 100, 254.0), ("炸鸡", 200, 520.0), ("薯条", 150, 468.0)]:
+            with self.subTest(name=name):
+                item = self.calc((name, grams)).json()["items"][0]
+                self.assertEqual(item["kcal"], kcal)
 
     def test_seed_refreshes_aliases_of_existing_seed_foods(self):
         db = TestingSessionLocal()

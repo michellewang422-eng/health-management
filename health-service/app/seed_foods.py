@@ -22,14 +22,14 @@ FOODS = [
     ("土豆（煮）", "土豆,马铃薯", 87),
     ("米粥", "粥,白粥", 46),
     # 蛋、肉、鱼、豆
-    ("鸡蛋（水煮）", "鸡蛋,水煮蛋,煮蛋", 155),
-    ("鸡胸肉（熟）", "鸡胸,鸡胸肉", 165),
-    ("鸡腿肉（熟）", "鸡腿,鸡腿肉", 209),
-    ("牛肉（瘦，熟）", "牛肉", 250),
-    ("猪里脊（熟）", "猪里脊,猪肉", 143),
-    ("猪五花肉（熟）", "五花肉", 518),
-    ("三文鱼（熟）", "三文鱼", 206),
-    ("鳕鱼（熟）", "鳕鱼", 105),
+    ("鸡蛋（水煮）", "蛋,鸡蛋,水煮蛋,煮蛋,egg", 155),
+    ("鸡胸肉（熟）", "鸡肉,鸡胸,鸡胸肉", 165),
+    ("鸡腿肉（熟）", "鸡肉,鸡腿,鸡腿肉", 209),
+    ("牛肉（瘦，熟）", "牛肉,牛排,瘦牛肉", 250),
+    ("猪里脊（熟）", "猪肉,猪里脊,里脊,瘦猪肉", 143),
+    ("猪五花肉（熟）", "猪肉,五花肉,猪五花", 518),
+    ("三文鱼（熟）", "鱼,鱼肉,三文鱼,salmon", 206),
+    ("鳕鱼（熟）", "鱼,鱼肉,鳕鱼", 105),
     ("虾（熟）", "虾,大虾", 99),
     ("金枪鱼罐头（水浸）", "金枪鱼,吞拿鱼", 116),
     ("豆腐", "老豆腐", 76),
@@ -80,8 +80,11 @@ FOODS = [
 
 
 def seed(db):
-    existing = {name for (name,) in db.query(FoodItem.name).all()}
+    existing = {f.name: f for f in db.query(FoodItem).all()}
     for name, aliases, kcal in FOODS:
-        if name not in existing:
+        row = existing.get(name)
+        if row is None:
             db.add(FoodItem(name=name, aliases=aliases, kcal_per_100g=kcal, source="seed"))
+        elif row.source == "seed" and row.aliases != aliases:
+            row.aliases = aliases       # 别名表更新后，已有的自带食物也跟着更新（不碰 AI 估算的）
     db.commit()

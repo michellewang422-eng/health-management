@@ -64,6 +64,7 @@
     const deleteBtn = document.getElementById("delete-btn");
 
     let loadedUser = null;   // 打开页面时的姓名邮箱，用来判断"有没有改"
+    let hasProfile = true;   // false = 用户在用户服务里有，但还没有健康档案（保存时要"创建"而不是"更新"）
 
     function fillForm(user, profile) {
       form.last.value = user.last_name;       // 用 .value 赋值：输入框里的内容永远只当文字，不会被当成 HTML
@@ -76,12 +77,25 @@
 
     async function load() {
       try {
-        // 两个请求互不依赖，同时发出去，比一个等一个更快
+        // 两个请求互不依赖，同时发出去，比一个等一个更快。
+        // 档案 404 不算出错：说明这个用户还没建过健康档案，让他在这里填写后创建
         const [user, profile] = await Promise.all([
           userApi(`/users/${me.id}`),
-          healthApi(`/profiles/${me.id}`),
+          healthApi(`/profiles/${me.id}`).catch(e => {
+            if (e.status === 404) return null;
+            throw e;
+          }),
         ]);
-        fillForm(user, profile);
+        if (profile) {
+          fillForm(user, profile);
+        } else {
+          hasProfile = false;
+          loadedUser = user;
+          form.last.value = user.last_name;
+          form.first.value = user.first_name;
+          form.email.value = user.email;
+          showError(successBox, "你还没有健康档案：填写下面的必填项（年龄、性别、身高、体重）并保存，就会建立档案。");
+        }
       } catch (e) {
         showError(errorBox, e.message);
         saveBtn.disabled = true;
@@ -115,13 +129,15 @@
           renderNav("profile.html");
         }
 
-        // 第 2 步：健康资料。start_date 留空 = 保持原来的（后端的规则）
+        // 第 2 步：健康资料。start_date 留空 = 保持原来的（后端的规则）；
+        // 还没有档案时用 POST 创建（带上 user_id），已有档案用 PUT 更新
         let savedProfile;
         try {
-          savedProfile = await healthApi(`/profiles/${me.id}`, {
-            method: "PUT",
-            body: JSON.stringify({ ...health, start_date: form.start_date.value || null }),
-          });
+          const body = { ...health, start_date: form.start_date.value || null };
+          savedProfile = hasProfile
+            ? await healthApi(`/profiles/${me.id}`, { method: "PUT", body: JSON.stringify(body) })
+            : await healthApi("/profiles", { method: "POST", body: JSON.stringify({ user_id: me.id, ...body }) });
+          hasProfile = true;
         } catch (e) {
           if (userChanged) throw new Error(`姓名邮箱已保存，但健康资料保存失败：${e.message}`);
           throw e;
@@ -143,7 +159,9 @@
       try {
         // 顺序不能倒：先删健康档案，再删用户。
         // 反过来的话，如果删完用户后删档案失败，就会留下"没有主人的档案"
-        await healthApi(`/profiles/${me.id}`, { method: "DELETE" });
+        // 没建过健康档案的用户：档案 404 就当"已经没有了"，继续删用户，不能卡在这里
+        await healthApi(`/profiles/${me.id}`, { method: "DELETE" })
+          .catch(e => { if (e.status !== 404) throw e; });
         await userApi(`/users/${me.id}`, { method: "DELETE" });
         logout();
       } catch (e) {

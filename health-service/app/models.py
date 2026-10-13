@@ -68,3 +68,14 @@ class DailyLog(Base):
     exercise_type = Column(String)                                   # 如"快走"，选填
     calories_in = Column(Integer)                                    # 选填
     sleep_hours = Column(Float)                                      # 昨晚睡眠（小时），选填，记在醒来那天
+
+
+# FoodItem ↔ food_items 表：食物热量放在数据库里（可查、可加、可改），而不是写死在代码里
+class FoodItem(Base):
+    __tablename__ = "food_items"
+
+    id = Column(Integer, primary_key=True)
+    name = Column(String, unique=True, nullable=False)      # 如"米饭（熟）"，不能重名
+    aliases = Column(String, nullable=False, default="", server_default="")   # 逗号分隔的别名
+    kcal_per_100g = Column(Float, nullable=False)
+    source = Column(String, nullable=False, default="seed", server_default="seed")   # seed = 自带

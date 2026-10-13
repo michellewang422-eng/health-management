@@ -32,6 +32,11 @@ const HEALTH_FIELDS_HTML = `
       <input id="weight_kg" name="weight_kg" type="number" min="30" max="300" step="any" required>
       <div class="hint">30–300，也是周期的起始体重</div>
     </div>
+    <div class="field">
+      <label for="sleep_hours">平时每晚睡眠 (小时) <span class="opt">选填</span></label>
+      <input id="sleep_hours" name="sleep_hours" type="number" min="2" max="14" step="0.5">
+      <div class="hint">2–14，参考 7–9 小时</div>
+    </div>
   </div>
 
   <h2>体检指标 <span class="opt">（选填，留空即可）</span></h2>
@@ -94,6 +99,7 @@ function readHealthFields(root) {
     gender: v("gender"),
     height_cm: num(v("height_cm")),
     weight_kg: num(v("weight_kg")),
+    sleep_hours: num(v("sleep_hours")),              // 选填：留空 -> null
     baseline_glucose_mgdl: num(v("baseline_glucose_mgdl")),
     baseline_cholesterol_mgdl: num(v("baseline_cholesterol_mgdl")),
     baseline_systolic: num(v("baseline_systolic")),

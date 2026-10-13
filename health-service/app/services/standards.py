@@ -21,6 +21,14 @@ INTENSITY_FACTOR = {"low": 0.5, "moderate": 1, "high": 2}   # 折算成"中等�
 BMI_HEALTHY_MIN, BMI_HEALTHY_MAX = 18.5, 24.9
 DISCLAIMER = "仅供学习参考，不能替代医生诊断。"
 
+# 睡眠参考区间依据（页面上用小字显示，文字和链接只写这一处）
+SLEEP_SOURCES = [
+    {"name": "AASM/SRS 2015 共识：成人每晚应睡 7 小时或以上，长期少于 7 小时与多种健康风险相关",
+     "url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC4434546/"},
+    {"name": "NSF 2015 睡眠时长建议：18–64 岁 7–9 小时，65 岁及以上 7–8 小时",
+     "url": "https://pubmed.ncbi.nlm.nih.gov/29073412/"},
+]
+
 
 # ---------- 身体指标 ----------
 def calc_bmi(weight_kg, height_cm):
@@ -124,6 +132,23 @@ def hdl_reference(gender):
     return ">= 40" if gender == "male" else ">= 50"
 
 
+# ---------- 睡眠 ----------
+def sleep_range(age):
+    """参考睡眠区间（小时）：18–64 岁 7–9；65 岁及以上 7–8。依据见 SLEEP_SOURCES。"""
+    return (7.0, 8.0) if age >= 65 else (7.0, 9.0)
+
+
+def classify_sleep(hours, age):
+    """short：低于下限；normal：区间内；long：高于上限。没填返回 None。"""
+    if hours is None:
+        return None
+    lo, hi = sleep_range(age)
+    h = round(hours, 2)
+    if h < lo:
+        return "short"
+    return "normal" if h <= hi else "long"
+
+
 # ---------- 拼成一个完整结果 ----------
 def build_standards(profile):
     """把上面所有结果拼成一个字典，作为 GET /profiles/{id}/standards 的返回值。
@@ -151,6 +176,11 @@ def build_standards(profile):
             "daily_effective_minutes": daily_exercise_minutes(profile.goal_type),
             "suggested": suggested_exercises(profile.age),
         },
+        "sleep": {
+            "min_hours": sleep_range(profile.age)[0],
+            "max_hours": sleep_range(profile.age)[1],
+            "sources": SLEEP_SOURCES,
+        },
         "reference_ranges": {
             "fasting_glucose_mgdl": "< 100",
             "blood_pressure_mmhg": "< 120/80",
@@ -166,6 +196,7 @@ def build_standards(profile):
                 else classify_blood_pressure(systolic, diastolic)
             ),
             "cholesterol": None if cholesterol is None else classify_cholesterol(cholesterol),
+            "sleep": classify_sleep(getattr(profile, "sleep_hours", None), profile.age),
         },
         "disclaimer": DISCLAIMER,
     }

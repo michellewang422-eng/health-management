@@ -14,6 +14,7 @@ from app.services.standards import (
     daily_calories,
     daily_exercise_minutes,
     effective_minutes,
+    sleep_range,
     weekly_weight_change,
 )
 
@@ -43,6 +44,17 @@ def score_calories(calories_in, target):
     if ratio >= CAL_LOW:
         return "met"
     return "missed"            # 摄入不足
+
+
+def score_sleep(hours, age):
+    """睡眠是区间型标准：低于下限偏短（missed），区间内完成（met），高于上限偏长（exceeded）。"""
+    lo, hi = sleep_range(age)
+    h = round(hours, 2)
+    if h < lo:
+        return "missed"
+    if h <= hi:
+        return "met"
+    return "exceeded"
 
 
 def expected_weight(start_weight, goal_type, start_date, log_date):
@@ -79,6 +91,8 @@ def tone_for(metric, status, goal_type):
         return "good"
     if status == "missed":
         return "bad"
+    if metric == "sleep":
+        return "warn"          # 睡太久不是"超额完成"，是提醒
     if metric == "calories" and goal_type != "gain_weight":
         return "warn"
     return "good"
@@ -98,9 +112,10 @@ def build_log_out(profile, log):
     cal_target = daily_calories(profile.gender, profile.age, profile.height_cm,
                                 profile.weight_kg, goal)
     exercise_target = daily_exercise_minutes(goal)
+    sleep_lo, sleep_hi = sleep_range(profile.age)
     weight_target = expected_weight(profile.weight_kg, goal, profile.start_date, log.log_date)
 
-    scores = {"weight": None, "exercise": None, "calories": None}
+    scores = {"weight": None, "exercise": None, "calories": None, "sleep": None}
     if log.weight_kg is not None:
         scores["weight"] = _score("weight", score_weight(log.weight_kg, weight_target, goal), goal)
     # 运动时间默认 0，所以运动总是要打分的
@@ -108,6 +123,9 @@ def build_log_out(profile, log):
     scores["exercise"] = _score("exercise", score_exercise(eff, exercise_target), goal)
     if log.calories_in is not None:
         scores["calories"] = _score("calories", score_calories(log.calories_in, cal_target), goal)
+    sleep = getattr(log, "sleep_hours", None)
+    if sleep is not None:
+        scores["sleep"] = _score("sleep", score_sleep(sleep, profile.age), goal)
 
     given = [s for s in scores.values() if s is not None]
     return {
@@ -117,10 +135,12 @@ def build_log_out(profile, log):
         "exercise_intensity": log.exercise_intensity,
         "exercise_type": log.exercise_type,
         "calories_in": log.calories_in,
+        "sleep_hours": getattr(log, "sleep_hours", None),
         "targets": {
             "weight_kg": round(weight_target, 2),
             "exercise_effective_minutes": exercise_target,
             "calories": cal_target,
+            "sleep_hours": {"min": sleep_lo, "max": sleep_hi},
         },
         "scores": scores,
         "points": sum(1 for s in given if s["tone"] == "good"),

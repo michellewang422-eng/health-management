@@ -12,6 +12,7 @@ from app.services.scoring import (
     expected_weight,
     score_calories,
     score_exercise,
+    score_sleep,
     score_weight,
     tone_for,
 )
@@ -120,4 +121,39 @@ class BuildLogOutTestCase(unittest.TestCase):
     def test_targets_for_lose_weight_profile(self):
         out = build_log_out(make_profile(), make_log())
         self.assertEqual(out["targets"],
-                         {"weight_kg": 60.0, "exercise_effective_minutes": 45, "calories": 1280})
+                         {"weight_kg": 60.0, "exercise_effective_minutes": 45, "calories": 1280,
+                          "sleep_hours": {"min": 7, "max": 9}})
+
+
+class SleepScoreTestCase(unittest.TestCase):
+    # ---- T85-2 35 岁区间 7–9：刚好等于与差一点点 ----
+    def test_sleep_boundaries_age_35(self):
+        for hours, expected in [(6.9, "missed"), (6.99, "missed"), (7.0, "met"),
+                                (9.0, "met"), (9.1, "exceeded")]:
+            with self.subTest(hours=hours):
+                self.assertEqual(score_sleep(hours, 35), expected)
+
+    # ---- T85-3 65 岁及以上区间 7–8 ----
+    def test_sleep_boundaries_age_70(self):
+        self.assertEqual(score_sleep(8.0, 70), "met")
+        self.assertEqual(score_sleep(8.5, 70), "exceeded")
+
+    # ---- T85-4 tone：偏长是 warn，不是 good ----
+    def test_sleep_tone(self):
+        self.assertEqual(tone_for("sleep", "missed", "maintain"), "bad")
+        self.assertEqual(tone_for("sleep", "met", "maintain"), "good")
+        self.assertEqual(tone_for("sleep", "exceeded", "maintain"), "warn")
+        self.assertEqual(tone_for("sleep", "exceeded", "gain_weight"), "warn")
+
+    # ---- T85-11 / T85-12 ----
+    def test_log_with_sleep_is_scored_and_counted(self):
+        out = build_log_out(make_profile(), make_log(exercise_minutes=50, sleep_hours=7.5))
+        self.assertEqual(out["scores"]["sleep"], {"status": "met", "tone": "good"})
+        self.assertEqual(out["sleep_hours"], 7.5)
+        self.assertEqual(out["targets"]["sleep_hours"], {"min": 7, "max": 9})
+        self.assertEqual(out["scored"], 2)    # 运动 + 睡眠
+
+    def test_log_without_sleep_is_unchanged(self):
+        out = build_log_out(make_profile(), make_log(exercise_minutes=50, calories_in=1300))
+        self.assertIsNone(out["scores"]["sleep"])
+        self.assertEqual(out["scored"], 2)    # 回归：和加睡眠之前一样

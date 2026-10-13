@@ -175,3 +175,31 @@ class ProfileAPITestCase(DBTestCase):
         self.assertEqual(self.client.delete("/profiles/1").status_code, 204)
         self.assertEqual(self.client.get("/profiles/1").status_code, 404)
         self.assertEqual(self.client.delete("/profiles/1").status_code, 404)
+
+
+class ProfileSleepTestCase(ProfileAPITestCase):
+    # ---- T85-7 睡眠选填：不传也能建档 ----
+    def test_sleep_is_optional(self):
+        resp = self.create()
+        self.assertEqual(resp.status_code, 201)
+        self.assertIsNone(resp.json()["sleep_hours"])
+
+    # ---- T85-6 范围 2–14 ----
+    def test_sleep_boundaries(self):
+        for hours, expected in [(1.5, 422), (2, 201), (14, 201), (14.5, 422)]:
+            with self.subTest(hours=hours):
+                self.reset_db()
+                self.assertEqual(self.create(sleep_hours=hours).status_code, expected)
+
+    def test_sleep_echoes_back(self):
+        self.assertEqual(self.create(sleep_hours=7.5).json()["sleep_hours"], 7.5)
+
+    # ---- T85-8 PUT 改睡眠；传 null 清空 ----
+    def test_update_and_clear_sleep(self):
+        self.create(sleep_hours=7.5)
+        body = {k: v for k, v in self.client.get("/profiles/1").json().items()
+                if k not in ("id", "user_id", "created_at", "updated_at")}
+        body["sleep_hours"] = 5.5
+        self.assertEqual(self.client.put("/profiles/1", json=body).json()["sleep_hours"], 5.5)
+        body["sleep_hours"] = None
+        self.assertIsNone(self.client.put("/profiles/1", json=body).json()["sleep_hours"])

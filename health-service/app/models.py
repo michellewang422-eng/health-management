@@ -34,6 +34,7 @@ class HealthProfile(Base):
     baseline_cholesterol_mgdl = Column(Float)
     baseline_systolic = Column(Integer)
     baseline_diastolic = Column(Integer)
+    sleep_hours = Column(Float)          # 平时每晚平均睡眠（小时），选填
 
     # default=...：Python 这边没给值时，SQLAlchemy 在插入前自动补上
     goal_type = Column(String, nullable=False, default="maintain")
@@ -66,3 +67,4 @@ class DailyLog(Base):
     exercise_intensity = Column(String, nullable=False, default="moderate", server_default="moderate")
     exercise_type = Column(String)                                   # 如"快走"，选填
     calories_in = Column(Integer)                                    # 选填
+    sleep_hours = Column(Float)                                      # 昨晚睡眠（小时），选填，记在醒来那天

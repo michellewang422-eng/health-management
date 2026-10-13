@@ -22,6 +22,7 @@ class ProfileIn(BaseModel):
     baseline_cholesterol_mgdl: Optional[float] = Field(default=None, ge=80, le=500)
     baseline_systolic: Optional[int] = Field(default=None, ge=70, le=250)
     baseline_diastolic: Optional[int] = Field(default=None, ge=40, le=150)
+    sleep_hours: Optional[float] = Field(default=None, ge=2, le=14)   # 平时每晚睡眠
     goal_type: Literal["lose_weight", "maintain", "gain_weight"] = "maintain"
     goal_note: Optional[str] = Field(default=None, max_length=200)
     cycle_days: int = Field(default=30, ge=7, le=365)   # 没填就是 30 天
@@ -64,6 +65,7 @@ class LogIn(BaseModel):
     exercise_intensity: Literal["low", "moderate", "high"] = "moderate"
     exercise_type: Optional[str] = Field(default=None, max_length=50)
     calories_in: Optional[int] = Field(default=None, ge=0, le=10000)
+    sleep_hours: Optional[float] = Field(default=None, ge=0, le=24)    # 昨晚睡眠
 
 
 # 一项指标的打分结果：status 是文字结论，tone 是颜色倾向（前端用它决定徽章颜色）
@@ -76,12 +78,19 @@ class Scores(BaseModel):
     weight: Optional[Score] = None      # 没填体重 = None（不打分）
     exercise: Optional[Score] = None
     calories: Optional[Score] = None
+    sleep: Optional[Score] = None
+
+
+class SleepTarget(BaseModel):
+    min: float
+    max: float
 
 
 class Targets(BaseModel):
     weight_kg: float
     exercise_effective_minutes: int
     calories: int
+    sleep_hours: SleepTarget
 
 
 # LogOut：返回的一天记录 = 原始数据 + 当天目标 + 打分 + 得分（x/scored）
@@ -92,6 +101,7 @@ class LogOut(BaseModel):
     exercise_intensity: str
     exercise_type: Optional[str]
     calories_in: Optional[int]
+    sleep_hours: Optional[float]
     targets: Targets
     scores: Scores
     points: int

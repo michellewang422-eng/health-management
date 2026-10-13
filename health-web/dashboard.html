@@ -56,6 +56,11 @@
             <label for="calories_in">摄入热量 (kcal) <span class="opt">选填</span></label>
             <input id="calories_in" type="number" min="0" max="10000" step="1">
           </div>
+          <div class="field">
+            <label for="sleep_hours">昨晚睡眠 (小时) <span class="opt">选填</span></label>
+            <input id="sleep_hours" type="number" min="0" max="24" step="0.25">
+            <div class="hint">记在醒来这一天</div>
+          </div>
         </div>
         <div class="hint">同一天再次保存会覆盖当天的记录。</div>
         <div class="btn-row">
@@ -68,13 +73,13 @@
     <section class="card" id="table-card" hidden>
       <h2>追踪表</h2>
       <p class="sub">点击某一行可以把数据填回上面的表单修改。徽章：<span class="badge good">完成 / 超额</span>
-        <span class="badge warn">提醒（如热量超标）</span> <span class="badge bad">未完成</span>；得分 = 绿色徽章数 / 已填项数。</p>
+        <span class="badge warn">提醒（如热量超标）</span> <span class="badge bad">未完成</span>；得分 = 绿色徽章数 / 已填项数（睡眠有记录时最多 4 项）。</p>
       <div class="table-wrap">
         <table>
           <thead>
             <tr>
-              <th>日期</th><th>体重 (kg)</th><th>运动</th><th>热量 (kcal)</th>
-              <th>体重</th><th>运动</th><th>热量</th><th>得分</th><th></th>
+              <th>日期</th><th>体重 (kg)</th><th>运动</th><th>热量 (kcal)</th><th>睡眠 (h)</th>
+              <th>体重</th><th>运动</th><th>热量</th><th>睡眠</th><th>得分</th><th></th>
             </tr>
           </thead>
           <tbody id="log-rows"></tbody>
@@ -91,6 +96,8 @@
 
     // ---------- 文字映射：后端返回英文代码，页面显示中文 ----------
     const STATUS_TEXT = { exceeded: "超额", met: "完成", missed: "未完成" };
+    // 睡眠是区间型标准，"超额"在这里是"偏长"，"未完成"是"偏短"
+    const SLEEP_STATUS_TEXT = { exceeded: "偏长", met: "完成", missed: "偏短" };
     const INTENSITY_TEXT = { low: "低强度", moderate: "中等", high: "高强度" };
     const BMI_TEXT = { underweight: "偏瘦", normal: "正常", overweight: "超重", obese: "肥胖" };
     // 原始指标评估：[中文, 徽章颜色]
@@ -99,6 +106,7 @@
       blood_pressure: { normal: ["正常", "good"], elevated: ["偏高", "warn"], stage1: ["一期高血压范围", "warn"],
                         stage2: ["二期高血压范围", "bad"], crisis: ["危急，请立即就医", "bad"] },
       cholesterol: { ideal: ["理想", "good"], borderline: ["边缘偏高", "warn"], high: ["高", "bad"] },
+      sleep: { short: ["偏短", "bad"], normal: ["正常", "good"], long: ["偏长", "warn"] },
     };
 
     // ---------- 页面元素 ----------
@@ -118,9 +126,9 @@
 
     // ---------- 渲染：徽章 ----------
     // 徽章里一定有文字，不能只靠颜色：色盲的用户也要能看懂
-    function badge(score) {
+    function badge(score, texts = STATUS_TEXT) {
       if (!score) return '<span class="badge none">—</span>';
-      return `<span class="badge ${score.tone}">${STATUS_TEXT[score.status]}</span>`;
+      return `<span class="badge ${score.tone}">${texts[score.status]}</span>`;
     }
 
     function assessBadge(kind, status) {
@@ -144,6 +152,11 @@
         // toFixed(1)：JavaScript 会把 22.0 显示成 22，要固定保留 1 位小数
         stat("BMI", `${s.bmi.toFixed(1)} ${esc(BMI_TEXT[s.bmi_category])}`,
              `健康体重范围 ${s.healthy_weight_kg[0]}–${s.healthy_weight_kg[1]} kg`),
+        // 睡眠标准随年龄变；下面用小字写明依据（文字和链接都来自后端 sleep.sources）
+        stat("每晚睡眠", `${s.sleep.min_hours}–${s.sleep.max_hours} 小时`,
+             assessBadge("sleep", a.sleep) +
+             `<small class="evidence">依据：${s.sleep.sources.map(src =>
+               `<a href="${esc(src.url)}" target="_blank" rel="noopener">${esc(src.name)}</a>`).join("；")}。</small>`),
         stat("空腹血糖", `${esc(r.fasting_glucose_mgdl)} mg/dL`, assessBadge("glucose", a.glucose)),
         stat("血压", `${esc(r.blood_pressure_mmhg)} mmHg`, assessBadge("blood_pressure", a.blood_pressure)),
         stat("总胆固醇", `${esc(r.total_cholesterol_mgdl)} mg/dL`,
@@ -165,9 +178,11 @@
         <td title="今日期望体重 ${t.weight_kg} kg">${log.weight_kg ?? "—"}</td>
         <td>${log.exercise_minutes} 分钟（${INTENSITY_TEXT[log.exercise_intensity]}）${type}</td>
         <td title="今日目标 ${t.calories} kcal">${log.calories_in ?? "—"}</td>
+        <td title="建议 ${t.sleep_hours.min}–${t.sleep_hours.max} 小时">${log.sleep_hours ?? "—"}</td>
         <td>${badge(log.scores.weight)}</td>
         <td>${badge(log.scores.exercise)}</td>
         <td>${badge(log.scores.calories)}</td>
+        <td>${badge(log.scores.sleep, SLEEP_STATUS_TEXT)}</td>
         <td>${log.points}/${log.scored}</td>
         <td><button type="button" class="link-btn del">删除</button></td>
       </tr>`;
@@ -216,6 +231,7 @@
       $("exercise_intensity").value = log.exercise_intensity;
       $("exercise_type").value = log.exercise_type ?? "";
       $("calories_in").value = log.calories_in ?? "";
+      $("sleep_hours").value = log.sleep_hours ?? "";
       window.scrollTo({ top: $("checkin-card").offsetTop - 60, behavior: "smooth" });
     }
 
@@ -234,6 +250,7 @@
             exercise_intensity: $("exercise_intensity").value,
             exercise_type: $("exercise_type").value.trim() || null,
             calories_in: num($("calories_in").value),
+            sleep_hours: num($("sleep_hours").value),
           }),
         });
         await loadLogs();                    // 保存后重新读，表里立刻出现新行 / 更新的行

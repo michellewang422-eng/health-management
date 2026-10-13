@@ -33,6 +33,20 @@ class PureFunctionsTestCase(unittest.TestCase):
         foods = [food("米饭（熟）加肉"), food("米饭（熟）")]
         self.assertEqual(match_food("米", foods).name, "米饭（熟）")
 
+    def test_generic_alias_and_core_name(self):
+        foods = [food("鸡胸肉（熟）", "鸡肉,鸡胸"), food("鸡腿肉（熟）", "鸡肉,鸡腿"), food("米饭（熟）", "白饭")]
+        self.assertEqual(match_food("鸡肉", foods).name, "鸡胸肉（熟）")      # 多个同别名：取靠前的
+        self.assertEqual(match_food("米饭", foods).name, "米饭（熟）")        # 去掉括号的名字
+        self.assertEqual(match_food("鸡腿肉", foods).name, "鸡腿肉（熟）")
+
+    def test_keyword_containing_food_term(self):
+        foods = [food("鸡胸肉（熟）", "鸡肉,鸡胸"), food("猪里脊（熟）", "猪肉"), food("鸡蛋（水煮）", "蛋,鸡蛋")]
+        self.assertEqual(match_food("烤鸡胸肉", foods).name, "鸡胸肉（熟）")
+        self.assertEqual(match_food("红烧猪肉", foods).name, "猪里脊（熟）")
+        self.assertEqual(match_food("煎鸡蛋", foods).name, "鸡蛋（水煮）")
+        self.assertIsNone(match_food("火星果", foods))
+        self.assertIsNone(match_food("蛋糕", foods))      # 单字「蛋」不算：避免误配
+
     # ---- T10-5 大小写 ----
     def test_case_insensitive(self):
         foods = [food("苹果", "apple")]
@@ -86,6 +100,22 @@ class CaloriesAPITestCase(DBTestCase):
         seed(db)
         self.assertEqual(db.query(FoodItem).count(), before)
         self.assertGreaterEqual(before, 50)
+        db.close()
+
+    def test_common_words_match_seed_foods(self):
+        for word, expected in [("鸡肉", "鸡胸肉（熟）"), ("猪肉", "猪里脊（熟）"), ("牛肉", "牛肉（瘦，熟）"),
+                               ("鱼", "三文鱼（熟）"), ("红烧猪肉", "猪里脊（熟）"), ("米饭", "米饭（熟）")]:
+            with self.subTest(word=word):
+                self.assertEqual(self.calc((word, 100)).json()["items"][0]["matched"], expected)
+
+    def test_seed_refreshes_aliases_of_existing_seed_foods(self):
+        db = TestingSessionLocal()
+        row = db.query(FoodItem).filter_by(name="鸡胸肉（熟）").one()
+        row.aliases = ""
+        db.commit()
+        seed(db)
+        db.refresh(row)
+        self.assertIn("鸡肉", row.aliases)
         db.close()
 
     # ---- T10-10 重名 ----

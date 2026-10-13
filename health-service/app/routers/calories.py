@@ -25,5 +25,5 @@ def search_foods(q: str = "", db: Session = Depends(get_db)):
 
 @router.post("/calories/calculate")
 def calculate_calories(payload: CalculateIn, db: Session = Depends(get_db)):
-    foods = db.query(FoodItem).all()
+    foods = db.query(FoodItem).order_by(FoodItem.id).all()
     return calculate([i.model_dump() for i in payload.items], foods)

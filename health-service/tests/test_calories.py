@@ -129,6 +129,20 @@ class CaloriesAPITestCase(DBTestCase):
                 item = self.calc((name, grams)).json()["items"][0]
                 self.assertEqual(item["kcal"], kcal)
 
+    # 手算：每项 = 克数 ÷ 100 × 每 100 g 千卡
+    def test_fried_foods(self):
+        for name, grams, kcal in [("炸鸡翅", 100, 320.0), ("炸鸡腿", 150, 405.0), ("炸鸡胸肉", 200, 500.0),
+                                  ("炸猪排", 120, 360.0), ("炸牛排", 100, 280.0), ("炸地瓜条", 50, 140.0)]:
+            with self.subTest(name=name):
+                item = self.calc((name, grams)).json()["items"][0]
+                self.assertEqual((item["matched"], item["kcal"]), (name, kcal))
+
+    def test_plain_words_do_not_pick_fried_versions(self):
+        # 「鸡腿」「鸡翅」「猪排」不能被炸的版本抢走（炸的要写全名）
+        self.assertEqual(self.calc(("鸡腿", 100)).json()["items"][0]["matched"], "鸡腿肉（熟）")
+        self.assertEqual(self.calc(("鸡翅", 100)).json()["items"][0]["matched"], "鸡翅（烤）")
+        self.assertEqual(self.calc(("炸鸡", 100)).json()["items"][0]["matched"], "炸鸡")
+
     def test_seed_refreshes_aliases_of_existing_seed_foods(self):
         db = TestingSessionLocal()
         row = db.query(FoodItem).filter_by(name="鸡胸肉（熟）").one()

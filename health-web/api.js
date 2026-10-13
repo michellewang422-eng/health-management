@@ -31,7 +31,11 @@ async function request(base, path, options = {}) {
   }
   if (resp.status === 204) return null;                  // 204 = 成功但没有内容
   const data = await resp.json().catch(() => null);      // 响应体不是 JSON 也不要崩
-  if (!resp.ok) throw new Error(errorText(data, resp.status));
+  if (!resp.ok) {
+    const err = new Error(errorText(data, resp.status));
+    err.status = resp.status;       // 页面可以据此区分"没有档案(404)"和别的错误
+    throw err;
+  }
   return data;
 }
 
@@ -52,6 +56,17 @@ function requireLogin() {
   const u = getCurrentUser();
   if (!u) location.href = "login.html";
   return u;
+}
+
+// 用户在用户服务里存在、但还没有健康档案时（比如用户服务里原有的老用户）：
+// 在提示区显示说明和「去建立档案」的链接，而不是只丢一句"健康档案不存在"。
+function showNoProfile(el) {
+  el.textContent = "你还没有健康档案，请先去「我的档案」填写必填项并保存。 ";
+  const a = document.createElement("a");
+  a.href = "profile.html";
+  a.textContent = "去建立档案";
+  el.appendChild(a);
+  el.hidden = false;
 }
 
 function logout() {

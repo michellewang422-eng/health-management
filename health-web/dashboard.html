@@ -211,7 +211,8 @@
         renderLogs(logs);
         for (const id of ["standards-card", "checkin-card", "table-card"]) $(id).hidden = false;
       } catch (e) {
-        showError(pageError, e.message);
+        if (e.status === 404) showNoProfile(pageError);   // 有用户但还没建档案：引导去建
+        else showError(pageError, e.message);
       }
     }
 

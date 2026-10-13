@@ -119,7 +119,8 @@
       try {
         renderReport(await healthApi(`/profiles/${me.id}/report`));
       } catch (e) {
-        showError($("page-error"), e.message);
+        if (e.status === 404) showNoProfile($("page-error"));
+        else showError($("page-error"), e.message);
       }
     })();
   </script>

@@ -109,6 +109,7 @@
     $("calc-form").addEventListener("submit", async (event) => {
       event.preventDefault();
       showError($("error"), "");
+      document.querySelectorAll(".suggest").forEach(u => { u.hidden = true; });   // 提交后收起候选
       const items = [...$("rows").children].map(row => ({
         name: row.querySelector(".food").value.trim(),
         grams: Number(row.querySelector(".grams").value),

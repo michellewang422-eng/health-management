@@ -69,6 +69,30 @@ function showNoProfile(el) {
   el.hidden = false;
 }
 
+// 页面中央的提示对话框（用 <dialog>，不用 alert：样式统一、不会卡住浏览器自动化）。
+// 点「好的」或按 Esc 关闭；返回一个 Promise，关闭后才会 resolve（要"关掉再跳转"时 await 它）。
+// message 一律用 textContent 填，里面有 <script> 也只是文字。
+function showDialog(message, { title = "提示", kind = "ok" } = {}) {
+  return new Promise(resolve => {
+    const dlg = document.createElement("dialog");
+    dlg.className = `dialog ${kind}`;
+    const h = document.createElement("h3");
+    h.textContent = title;
+    const p = document.createElement("p");
+    p.textContent = message;
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "btn";
+    btn.textContent = "好的";
+    btn.addEventListener("click", () => dlg.close());
+    dlg.append(h, p, btn);
+    dlg.addEventListener("close", () => { dlg.remove(); resolve(); });
+    document.body.appendChild(dlg);
+    dlg.showModal();
+    btn.focus();
+  });
+}
+
 function logout() {
   localStorage.removeItem("currentUser");
   location.href = "login.html";

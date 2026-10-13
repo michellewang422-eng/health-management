@@ -7,7 +7,7 @@ from sqlalchemy.exc import IntegrityError
 
 from app.models import FoodItem
 from app.seed_foods import seed
-from app.services.calories import item_kcal, match_food
+from app.services.calories import find_foods, item_kcal, match_food
 from tests._support import DBTestCase, TestingSessionLocal
 
 
@@ -27,25 +27,25 @@ class PureFunctionsTestCase(unittest.TestCase):
         self.assertEqual(match_food("鸡蛋", foods).name, "鸡蛋（水煮）")            # 别名完全一致
         self.assertEqual(match_food("胸肉", foods).name, "鸡胸肉（熟）")            # 包含
         self.assertIsNone(match_food("火星果", foods))
-        self.assertIsNone(match_food("  ", foods))
+        self.assertEqual(find_foods("  ", foods), [])
 
-    def test_contains_picks_shortest_name(self):
-        foods = [food("米饭（熟）加肉"), food("米饭（熟）")]
-        self.assertEqual(match_food("米", foods).name, "米饭（熟）")
-
-    def test_generic_alias_and_core_name(self):
+    def test_generic_word_is_ambiguous_not_defaulted(self):
         foods = [food("鸡胸肉（熟）", "鸡肉,鸡胸"), food("鸡腿肉（熟）", "鸡肉,鸡腿"), food("米饭（熟）", "白饭")]
-        self.assertEqual(match_food("鸡肉", foods).name, "鸡胸肉（熟）")      # 多个同别名：取靠前的
-        self.assertEqual(match_food("米饭", foods).name, "米饭（熟）")        # 去掉括号的名字
-        self.assertEqual(match_food("鸡腿肉", foods).name, "鸡腿肉（熟）")
+        self.assertEqual([f.name for f in find_foods("鸡肉", foods)], ["鸡胸肉（熟）", "鸡腿肉（熟）"])
+        self.assertIsNone(match_food("鸡肉", foods))            # 有歧义就不替用户选
+        self.assertEqual(match_food("鸡腿", foods).name, "鸡腿肉（熟）")
+        self.assertEqual(match_food("米饭", foods).name, "米饭（熟）")   # 去掉括号的名字
+
+    def test_contains_with_several_hits_is_ambiguous(self):
+        foods = [food("米饭（熟）加肉"), food("米饭（熟）")]
+        self.assertEqual(len(find_foods("米", foods)), 2)
 
     def test_keyword_containing_food_term(self):
         foods = [food("鸡胸肉（熟）", "鸡肉,鸡胸"), food("猪里脊（熟）", "猪肉"), food("鸡蛋（水煮）", "蛋,鸡蛋")]
         self.assertEqual(match_food("烤鸡胸肉", foods).name, "鸡胸肉（熟）")
         self.assertEqual(match_food("红烧猪肉", foods).name, "猪里脊（熟）")
         self.assertEqual(match_food("煎鸡蛋", foods).name, "鸡蛋（水煮）")
-        self.assertIsNone(match_food("火星果", foods))
-        self.assertIsNone(match_food("蛋糕", foods))      # 单字「蛋」不算：避免误配
+        self.assertEqual(find_foods("蛋糕", foods), [])     # 单字「蛋」不算：避免误配
 
     # ---- T10-5 大小写 ----
     def test_case_insensitive(self):
@@ -103,10 +103,24 @@ class CaloriesAPITestCase(DBTestCase):
         db.close()
 
     def test_common_words_match_seed_foods(self):
-        for word, expected in [("鸡肉", "鸡胸肉（熟）"), ("猪肉", "猪里脊（熟）"), ("牛肉", "牛肉（瘦，熟）"),
-                               ("鱼", "三文鱼（熟）"), ("红烧猪肉", "猪里脊（熟）"), ("米饭", "米饭（熟）")]:
+        for word, expected in [("牛肉", "牛肉（瘦，熟）"), ("鸡蛋", "鸡蛋（水煮）"), ("蛋", "鸡蛋（水煮）"),
+                               ("红烧猪里脊", "猪里脊（熟）"), ("米饭", "米饭（熟）")]:
             with self.subTest(word=word):
                 self.assertEqual(self.calc((word, 100)).json()["items"][0]["matched"], expected)
+
+    # 通用词有多个候选：不默认，返回选项让用户选，也不计入总数
+    def test_generic_words_return_options(self):
+        for word, options in [("鸡肉", ["鸡胸肉（熟）", "鸡腿肉（熟）"]),
+                              ("猪肉", ["猪里脊（熟）", "猪五花肉（熟）"]),
+                              ("鱼", ["三文鱼（熟）", "鳕鱼（熟）"])]:
+            with self.subTest(word=word):
+                body = self.calc(("米饭", 100), (word, 100)).json()
+                self.assertEqual(body["items"][0]["matched"], "米饭（熟）")
+                self.assertEqual(body["total_kcal"], 130.0)
+                self.assertEqual(body["unmatched"], [])
+                amb = body["ambiguous"][0]
+                self.assertEqual((amb["index"], amb["input"]), (1, word))
+                self.assertEqual([o["name"] for o in amb["options"]], options)
 
     def test_seed_refreshes_aliases_of_existing_seed_foods(self):
         db = TestingSessionLocal()

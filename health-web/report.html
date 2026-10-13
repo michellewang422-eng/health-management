@@ -1,0 +1,128 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>周期报告 · 健康管理</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <nav id="nav"></nav>
+
+  <main class="wrap">
+    <h1>周期报告</h1>
+    <div class="alert" id="page-error" hidden></div>
+    <p class="status-bar" id="status-bar" hidden></p>
+
+    <section class="card" id="summary-card" hidden>
+      <h2>汇总</h2>
+      <div class="grid" id="summary"></div>
+    </section>
+
+    <p class="alert ok" id="empty-hint" hidden>还没有数据，去仪表盘打卡吧。</p>
+
+    <section class="card chart-card" id="charts" hidden>
+      <h2>体重（实际 vs 目标）</h2>
+      <div class="chart-box"><canvas id="weightChart"></canvas></div>
+      <h2>运动（折算成中等强度分钟）</h2>
+      <div class="chart-box"><canvas id="exerciseChart"></canvas></div>
+      <h2>摄入热量</h2>
+      <div class="chart-box"><canvas id="caloriesChart"></canvas></div>
+      <h2>睡眠</h2>
+      <div class="chart-box"><canvas id="sleepChart"></canvas></div>
+      <p class="hint">睡眠的两条虚线是建议区间（7–9 小时；65 岁及以上 7–8 小时），低于下限算偏短。
+        依据见仪表盘「每晚睡眠」下方的小字。</p>
+    </section>
+
+    <p class="disclaimer">仅供学习参考，不能替代医生诊断。</p>
+  </main>
+
+  <!-- 固定主版本和小版本，避免 CDN 上的新版本悄悄改变行为 -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+  <script src="api.js"></script>
+  <script>
+    const me = requireLogin();
+    renderNav("report.html");
+    const $ = id => document.getElementById(id);
+    let charts = [];
+
+    function stat(label, value, note = "") {
+      return `<div class="stat"><div class="label">${esc(label)}</div><div class="value">${esc(value)}</div>` +
+             (note ? `<div class="note">${esc(note)}</div>` : "") + `</div>`;
+    }
+
+    // 每次渲染前先销毁旧图，否则同一个 canvas 上会叠两张图
+    function drawChart(id, datasets, labels, options = {}) {
+      charts.push(new Chart($(id), {
+        data: { labels, datasets },
+        options: { responsive: true, maintainAspectRatio: false, spanGaps: true, ...options },
+      }));
+    }
+
+    function renderReport(report) {
+      charts.forEach(c => c.destroy());
+      charts = [];
+      const { cycle, series, summary: s } = report;
+
+      const bar = $("status-bar");
+      bar.hidden = false;
+      bar.textContent = cycle.is_finished
+        ? `周期已结束（${cycle.start_date} 至 ${cycle.end_date}，共 ${cycle.days} 天）`
+        : `进行中，第 ${cycle.elapsed_days}/${cycle.days} 天，当前为预览（${cycle.start_date} 至 ${cycle.end_date}）`;
+
+      const dash = v => (v === null ? "—" : v);
+      const c = s.status_counts;
+      const cnt = (m, names) => `${names[0]} ${c[m].exceeded} / ${names[1]} ${c[m].met} / ${names[2]} ${c[m].missed}`;
+      $("summary").innerHTML = [
+        stat("打卡天数", `${s.logged_days} 天`),
+        stat("完成率", s.completion_rate_pct === null ? "—" : `${s.completion_rate_pct}%`,
+             `得分 ${s.points}/${s.scored}`),
+        stat("平均摄入热量", s.avg_calories === null ? "—" : `${s.avg_calories} kcal`),
+        stat("运动总时长", `${s.total_exercise_minutes} 分钟`),
+        stat("体重变化", s.weight_change_kg === null ? "—" : `${s.weight_change_kg} kg`),
+        stat("平均睡眠", s.avg_sleep_hours === null ? "—" : `${s.avg_sleep_hours} 小时`),
+        stat("体重", cnt("weight", ["超额", "完成", "未完成"])),
+        stat("运动", cnt("exercise", ["超额", "完成", "未完成"])),
+        stat("热量", cnt("calories", ["超额", "完成", "未完成"])),
+        stat("睡眠", cnt("sleep", ["偏长", "完成", "偏短"])),
+      ].join("");
+      $("summary-card").hidden = false;
+
+      $("empty-hint").hidden = s.logged_days > 0;
+      $("charts").hidden = s.logged_days === 0;
+      if (s.logged_days === 0) return;
+
+      const labels = series.map(d => d.date.slice(5));        // "10-01"
+      const line = (label, key, extra = {}) => ({ type: "line", label, data: series.map(d => d[key]), ...extra });
+      const dashed = { borderDash: [6, 4], pointRadius: 0 };
+
+      drawChart("weightChart", [
+        line("实际体重", "weight_kg"),
+        line("目标体重", "target_weight_kg", dashed),
+      ], labels);
+      drawChart("exerciseChart", [
+        { type: "bar", label: "实际", data: series.map(d => d.exercise_effective_min) },
+        line("目标", "target_exercise_min", dashed),
+      ], labels);
+      drawChart("caloriesChart", [
+        line("实际摄入", "calories_in"),
+        line("目标热量", "target_calories", dashed),
+      ], labels);
+      drawChart("sleepChart", [
+        { type: "bar", label: "睡眠（小时）", data: series.map(d => d.sleep_hours) },
+        line("建议下限", "target_sleep_min_hours", dashed),
+        line("建议上限", "target_sleep_max_hours", dashed),
+      ], labels, { scales: { y: { min: 0, max: 12 } } });
+    }
+
+    (async () => {
+      if (!me) return;
+      try {
+        renderReport(await healthApi(`/profiles/${me.id}/report`));
+      } catch (e) {
+        showError($("page-error"), e.message);
+      }
+    })();
+  </script>
+</body>
+</html>

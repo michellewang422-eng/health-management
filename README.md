@@ -18,7 +18,7 @@ uvicorn app.main:app --reload --port 8000
 cd health-service && ../.venv/bin/uvicorn app.main:app --reload --port 8001
 
 # 终端 3：网页（端口 8777）
-cd health-web && python3 -m http.server 8777
+cd health-web && python3 serve.py 8777     # 不缓存，改了页面刷新就生效
 ```
 
 浏览器打开 <http://localhost:8777/login.html>。

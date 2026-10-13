@@ -243,6 +243,7 @@
       $("save-btn").disabled = true;
       try {
         const date = $("log_date").value;
+        const existed = logsByDate.has(date);      // 这一天原来有记录 = 这次是"更新"
         await healthApi(`/profiles/${me.id}/logs/${date}`, {
           method: "PUT",
           body: JSON.stringify({
@@ -256,8 +257,11 @@
         });
         await loadLogs();                    // 保存后重新读，表里立刻出现新行 / 更新的行
         showError(formSuccess, `已保存 ${date} 的记录`);
+        await showDialog(existed ? `${date} 的记录已更新。` : `${date} 的记录已保存。`,
+                         { title: existed ? "已更新" : "已保存" });
       } catch (e) {
         showError(formError, e.message);
+        showDialog(e.message, { title: "保存失败", kind: "error" });
       } finally {
         $("save-btn").disabled = false;
       }
@@ -274,8 +278,10 @@
         try {
           await healthApi(`/profiles/${me.id}/logs/${date}`, { method: "DELETE" });
           await loadLogs();
+          showDialog(`${date} 的记录已删除。`, { title: "已删除" });
         } catch (e) {
           showError(formError, e.message);
+          showDialog(e.message, { title: "删除失败", kind: "error" });
         }
         return;
       }

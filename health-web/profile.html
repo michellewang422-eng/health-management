@@ -107,6 +107,7 @@
       showError(errorBox, "");
       showError(successBox, "");
       saveBtn.disabled = true;
+      const wasNew = !hasProfile;     // 保存前是否还没有档案：决定提示"已创建"还是"已更新"
 
       try {
         const health = readHealthFields(form);
@@ -144,9 +145,14 @@
         }
 
         fillForm(savedUser, savedProfile);
-        showError(successBox, "已保存");
+        showError(successBox, wasNew ? "健康档案已创建" : "已保存");
+        window.scrollTo({ top: 0, behavior: "smooth" });
+        await showDialog(wasNew ? "健康档案已创建，内容已保存。" : "已保存：你的修改已更新。",
+                         { title: wasNew ? "档案已创建" : "已更新" });
       } catch (e) {
         showError(errorBox, e.message);
+        window.scrollTo({ top: 0, behavior: "smooth" });
+        showDialog(e.message, { title: "保存失败", kind: "error" });
       } finally {
         saveBtn.disabled = false;
       }
@@ -163,9 +169,12 @@
         await healthApi(`/profiles/${me.id}`, { method: "DELETE" })
           .catch(e => { if (e.status !== 404) throw e; });
         await userApi(`/users/${me.id}`, { method: "DELETE" });
+        await showDialog("账号和所有记录已删除。", { title: "已删除" });
         logout();
       } catch (e) {
         showError(errorBox, e.message);
+        window.scrollTo({ top: 0, behavior: "smooth" });
+        showDialog(e.message, { title: "删除失败", kind: "error" });
         deleteBtn.disabled = false;
       }
     });

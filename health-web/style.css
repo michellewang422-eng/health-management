@@ -141,3 +141,12 @@ tbody tr:hover { background: #f1f5f9; }
 
 /* 每页底部的免责声明 */
 .site-footer { text-align: center; color: var(--muted); font-size: 0.85rem; padding: 24px 16px; }
+
+/* 食物候选下拉 */
+.suggest-wrap { position: relative; }
+.suggest { position: absolute; z-index: 10; left: 0; right: 0; top: 100%; margin: 2px 0 0; padding: 4px 0;
+  list-style: none; background: #fff; border: 1px solid var(--border, #cbd5e0); border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0,0,0,.12); max-height: 240px; overflow-y: auto; }
+.suggest li { padding: 8px 12px; cursor: pointer; }
+.suggest li:hover { background: #ebf8ff; }
+.choice { margin: 4px 4px 0 0; padding: 4px 10px; font-size: 0.9rem; }

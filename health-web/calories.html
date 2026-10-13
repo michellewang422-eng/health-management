@@ -22,7 +22,6 @@
           <button type="submit" class="btn" id="calc-btn">计算</button>
         </div>
       </form>
-      <datalist id="food-list"></datalist>
     </section>
 
     <section class="card" id="result-card" hidden>
@@ -33,6 +32,7 @@
           <tbody id="result-rows"></tbody>
         </table>
       </div>
+      <div class="alert warn-box" id="ambiguous" hidden></div>
       <p class="alert warn-box" id="unmatched" hidden></p>
       <p class="total">总热量 <strong id="total"></strong> kcal</p>
       <div class="btn-row">
@@ -53,40 +53,55 @@
       const div = document.createElement("div");
       div.className = "row calc-row";
       div.innerHTML = `
-        <div class="field"><label>食物</label>
-          <input type="text" class="food" list="food-list" maxlength="50" placeholder="如：白饭" required></div>
+        <div class="field suggest-wrap"><label>食物</label>
+          <input type="text" class="food" maxlength="50" autocomplete="off" placeholder="如：鸡肉、白饭" required>
+          <ul class="suggest" hidden></ul></div>
         <div class="field"><label>克数 (g)</label>
           <input type="number" class="grams" min="1" max="5000" step="any" placeholder="如：150" required></div>
         <div class="field"><label>&nbsp;</label>
           <button type="button" class="link-btn remove">删除这行</button></div>`;
       // 用户输入的值用 .value 赋，不拼进 HTML
-      div.querySelector(".food").value = name;
+      const food = div.querySelector(".food");
+      food.value = name;
       div.querySelector(".grams").value = grams;
       div.querySelector(".remove").addEventListener("click", () => {
         if ($("rows").children.length > 1) div.remove();
       });
-      div.querySelector(".food").addEventListener("input", onFoodInput);
+      food.addEventListener("input", () => suggest(div));
+      food.addEventListener("focus", () => suggest(div));
+      // 点到别处时收起候选（延迟一下，让点选候选的 click 先生效）
+      food.addEventListener("blur", () => setTimeout(() => { div.querySelector(".suggest").hidden = true; }, 150));
       $("rows").appendChild(div);
     }
 
+    // 自己画候选列表，不用 <datalist>：datalist 只会显示"名字里含你输入的字"的选项，
+    // 写「鸡肉」时「鸡胸肉」「鸡腿肉」都会被浏览器藏起来。这里的候选来自后端（名字和别名都查）。
     // 防抖：输入停下 300 ms 后再去查，不用每敲一个字就发一次请求
-    let timer = null;
-    function onFoodInput(event) {
-      clearTimeout(timer);
-      const q = event.target.value.trim();
-      if (!q) return;
-      timer = setTimeout(async () => {
+    const timers = new WeakMap();
+    function suggest(row) {
+      const input = row.querySelector(".food");
+      const list = row.querySelector(".suggest");
+      const q = input.value.trim();
+      clearTimeout(timers.get(row));
+      if (!q) { list.hidden = true; return; }
+      timers.set(row, setTimeout(async () => {
         try {
           const foods = await healthApi(`/foods?q=${encodeURIComponent(q)}`);
-          const list = $("food-list");
           list.innerHTML = "";
           for (const f of foods) {
-            const opt = document.createElement("option");
-            opt.value = f.name;
-            list.appendChild(opt);
+            const li = document.createElement("li");
+            li.textContent = `${f.name} · ${f.kcal_per_100g} kcal/100g`;
+            // mousedown 比 blur 先发生，所以用它来选
+            li.addEventListener("mousedown", (e) => {
+              e.preventDefault();
+              input.value = f.name;
+              list.hidden = true;
+            });
+            list.appendChild(li);
           }
+          list.hidden = foods.length === 0;
         } catch (e) { /* 补全失败不影响手动输入 */ }
-      }, 300);
+      }, 300));
     }
 
     $("add-row").addEventListener("click", () => addRow());
@@ -104,6 +119,7 @@
         $("result-rows").innerHTML = r.items.map(i => `<tr>
           <td>${esc(i.input)}</td><td>${esc(i.matched)}</td><td>${i.grams}</td>
           <td>${i.kcal_per_100g}</td><td>${i.kcal.toFixed(1)}</td></tr>`).join("");
+        renderAmbiguous(r.ambiguous);
         const un = $("unmatched");
         un.hidden = r.unmatched.length === 0;
         un.textContent = r.unmatched.length ? `未找到：${r.unmatched.join("、")}（不计入总数）` : "";
@@ -116,6 +132,29 @@
         $("calc-btn").disabled = false;
       }
     });
+
+    // 有多个可能的食物（如「鸡肉」）：不替用户决定，列出选项，点哪个就把那一行改成哪个再算
+    function renderAmbiguous(list) {
+      const box = $("ambiguous");
+      box.hidden = list.length === 0;
+      box.innerHTML = "";
+      for (const a of list) {
+        const p = document.createElement("div");
+        p.append(`「${a.input}」有多种选择，请选一个（未选的不计入总数）：`);
+        for (const o of a.options) {
+          const b = document.createElement("button");
+          b.type = "button";
+          b.className = "btn ghost choice";
+          b.textContent = `${o.name} · ${o.kcal_per_100g} kcal/100g`;
+          b.addEventListener("click", () => {
+            [...$("rows").children][a.index].querySelector(".food").value = o.name;
+            $("calc-form").requestSubmit();
+          });
+          p.append(" ", b);
+        }
+        box.appendChild(p);
+      }
+    }
 
     // 把总热量带到仪表盘的"摄入热量"框（仪表盘读取 ?calories= 参数）
     $("to-checkin").addEventListener("click", () => {

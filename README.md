@@ -1,5 +1,7 @@
 # health-management
 
+**中文** | [English](#english)
+
 一个中文的个人健康管理网站：建立健康档案，每天记录体重、运动、摄入热量和睡眠，系统按参考标准自动打分，并用曲线图展示一个周期内的变化；还带一个卡路里计算器。
 
 > 这是学习项目。登录只输邮箱、没有密码，**不要放真实健康数据**；页面内容仅供学习参考，不能替代医生诊断。
@@ -130,3 +132,132 @@ cd health-service && ../.venv/bin/python -m unittest discover -v
 - 登录只输邮箱、没有密码、没有令牌，**不安全**，仅用于本地学习。
 - 所有页面底部都有「仅供学习参考，不能替代医生诊断」。
 - 参考标准是通用估算，不是个性化医疗建议。
+
+---
+
+<a id="english"></a>
+
+# health-management (English)
+
+[中文](#health-management)
+
+A Chinese-language personal health management website. Create a health profile, log weight, exercise, calorie intake and sleep every day, get automatic scores against reference standards, view period charts, and use a calorie calculator.
+
+> This is a learning project. Login uses an email only (no password), so **do not store real health data**. The content is for reference only and is not a substitute for medical advice. The user interface is in Chinese.
+
+## Features
+
+| Feature | Description |
+| --- | --- |
+| Sign up / log in / delete account | Name + email to register, email to log in (no password) |
+| Health profile | Age, gender, height, weight, goal (lose / maintain / gain); blood glucose, blood pressure, cholesterol and usual sleep are optional |
+| Reference standards | BMI, healthy weight range, BMR, daily calorie target, daily exercise target, sleep range, and baseline assessments for glucose / blood pressure / cholesterol / sleep |
+| Daily log | Weight, exercise minutes and intensity, calories eaten, last night's sleep; each item is scored exceeded / met / missed; saving the same day again overwrites it |
+| Period report | Four charts (weight, exercise, calories, sleep) with target lines, plus a summary |
+| Calorie calculator | Enter foods and grams to get total calories; generic words such as "chicken" with several candidates ask you to choose; one click fills today's log |
+
+## Architecture
+
+Three independent services talking over HTTP:
+
+```
+Browser ── health-web (8777, static pages)
+             ├── User-management-service (8000)  user name, email, login (separate repository)
+             └── health-service          (8001)  profile, logs, standards, report, calculator (this repo, FastAPI + SQLite)
+                       └── calls GET /users/{id} when a profile is created, to confirm the user exists
+```
+
+See the Chinese section above for the directory layout (paths are the same).
+
+## Getting started
+
+### Prerequisites
+
+- Python 3.10 or newer
+- `User-management-service`: a separate repository that handles registration and login; install it by following its own instructions
+
+Create a virtual environment and install dependencies from the repository root:
+
+```bash
+python3 -m venv .venv
+.venv/bin/pip install -r health-service/requirements.txt
+```
+
+### Run (three terminals)
+
+```bash
+# Terminal 1: User-management-service (port 8000), inside its own repository
+uvicorn app.main:app --reload --port 8000
+
+# Terminal 2: health-service (port 8001), from this repository's root
+cd health-service && ../.venv/bin/uvicorn app.main:app --reload --port 8001
+
+# Terminal 3: web pages (port 8777), served with caching disabled
+cd health-web && python3 serve.py 8777
+```
+
+Open <http://localhost:8777/login.html>. The auto-generated API docs are at <http://127.0.0.1:8001/docs>.
+
+Typical flow: register → profile is created automatically → dashboard shows standards and daily logging → report page shows charts → calculator estimates calories.
+
+### Ports and CORS
+
+The front end calls `http://127.0.0.1:8000` (user service) and `http://127.0.0.1:8001` (health-service); both are set at the top of `health-web/api.js`. The health-service CORS whitelist only allows pages opened from `localhost` / `127.0.0.1` on ports 8777 and 5500. If you change the front-end port, update `app/main.py` too.
+
+If the User-management-service's own web pages also run on port 8777, both sites share one `localStorage` (they both use the key `currentUser`). Use different ports, or open one via `localhost` and the other via `127.0.0.1`.
+
+### Database
+
+SQLite at `health-service/health.db` (git-ignored), created on first start. `create_all` only creates missing tables and never alters existing ones: if you see a missing column after upgrading (for example `sleep_hours`), delete `health.db` and restart (development data is disposable). Built-in foods are seeded idempotently on every start.
+
+## Tests
+
+```bash
+# Unit and API tests: no services need to be running
+cd health-service && ../.venv/bin/python -m unittest discover -v
+
+# Demo data: with both backends running, creates a user with 30 days of data and prints the login email
+.venv/bin/python scripts/seed_demo.py
+
+# End-to-end smoke test: calls both real backends, walks the full flow, cleans up; exit code 0 = pass
+.venv/bin/python scripts/smoke_test.py
+```
+
+## API overview (health-service)
+
+| Method and path | Purpose |
+| --- | --- |
+| `GET /health` | Liveness check |
+| `POST /profiles` | Create a profile (user must exist in the user service; 409 if one exists) |
+| `GET` / `PUT` / `DELETE /profiles/{user_id}` | Read / update / delete a profile (deleting also deletes the user's logs) |
+| `GET /profiles/{user_id}/standards` | Reference standards and baseline assessments |
+| `PUT /profiles/{user_id}/logs/{YYYY-MM-DD}` | Save a day's log (same day overwrites; no future dates) |
+| `GET /profiles/{user_id}/logs?from=&to=` | List logs with scores, ascending by date |
+| `DELETE /profiles/{user_id}/logs/{YYYY-MM-DD}` | Delete a day's log |
+| `GET /profiles/{user_id}/report` | Period report: series and summary |
+| `GET /foods?q=` | Search built-in foods |
+| `POST /calories/calculate` | Total calories for a list of "food + grams" |
+
+## Scoring rules
+
+Standards and scores are pure functions, **never stored and recomputed on every read**, so changing the profile (age, goal, ...) updates the scores of past logs automatically.
+
+- Each result is `exceeded`, `met` or `missed`; unfilled items are left out of the score denominator.
+- **Exercise**: minutes are converted by intensity (low ×0.5, moderate ×1, high ×2) and compared with the target: 30 minutes, or 45 for a weight-loss goal.
+- **Calories**: target = BMR × 1.375 (light activity), −500 for weight loss, +300 for weight gain, never below 1200 (female) / 1500 (male); intake counts as over the target only above 110% (which is good news for a weight-gain goal).
+- **Weight**: the expected weight is interpolated linearly from the start date toward the goal. Weight loss: 0.5 kg or more below expected is exceeded, at most 0.3 kg above expected is met; weight gain is the mirror image; maintain: within ±1.0 kg is met.
+- **Sleep**: 7–9 hours for ages 18–64, 7–8 hours for 65 and over; below the lower bound is "short", inside is met, above the upper bound is "long" (shown as a warning, not as a good result). Sources: AASM/SRS 2015 consensus (adults at least 7 hours per night) and NSF 2015 sleep duration recommendations, shown as small print with links on the page.
+
+## Adding built-in foods
+
+Add one row (name, aliases, kcal per 100 g) to the `FOODS` list in `health-service/app/seed_foods.py` and restart health-service. No migration is needed.
+
+## Development plan
+
+The detailed plan and decision log (in Chinese) is in [`docs/项目计划书.md`](docs/%E9%A1%B9%E7%9B%AE%E8%AE%A1%E5%88%92%E4%B9%A6.md). Development followed PR-01 to PR-11; the sleep feature is PR-08.5.
+
+## Safety notes and disclaimer
+
+- Login is email-only with no password and no token: **not secure**, for local learning only.
+- Every page footer says "For learning reference only; not a substitute for a doctor's diagnosis".
+- The reference standards are general estimates, not personalised medical advice.

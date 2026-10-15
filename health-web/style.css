@@ -158,3 +158,15 @@ tbody tr:hover { background: #f1f5f9; }
 .dialog h3 { margin: 0 0 8px; }
 .dialog.error h3 { color: var(--bad); }
 .dialog p { margin: 0 0 18px; line-height: 1.5; }
+
+/* 后端连不上时盖住整页的说明层（api.js 的 showUnavailable） */
+.unavailable {
+  position: fixed; inset: 0; z-index: 1000;
+  display: flex; align-items: center; justify-content: center;
+  padding: 16px; background: var(--bg);
+}
+.unavailable-card {
+  max-width: 520px; background: var(--card); border: 1px solid var(--border);
+  border-radius: 12px; padding: 28px 24px; text-align: center;
+}
+.unavailable-card h2 { margin-top: 0; color: var(--warn); }

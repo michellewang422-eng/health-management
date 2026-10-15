@@ -77,6 +77,17 @@ cd health-web && python3 serve.py 8777
 
 User-management-service 自带的网页如果也跑在 8777 端口，两个网页会共用同一份 `localStorage`（都用 `currentUser` 这个键）；同时开发时请用不同端口，或者一个用 `localhost`、一个用 `127.0.0.1` 打开。
 
+### 公开演示（GitHub Pages + 本机后端）
+
+演示站的网页放在 GitHub Pages（一直在线），后端仍在你自己的电脑上，通过隧道对外：
+
+1. 仓库 Settings → Pages，Source 选 `main` 分支，目录选 `/health-web`（如目录不可选，可用 GitHub Actions 发布 `health-web`）。
+2. 开机后启动两个后端，再各开一条隧道（例如 Cloudflare Tunnel：`cloudflared tunnel --url http://127.0.0.1:8000` 和 `--url http://127.0.0.1:8001`），得到两个 https 地址。
+3. 把这两个地址填进 `health-web/api.js` 的 `PUBLIC_USER_API` / `PUBLIC_HEALTH_API`，提交并推送。
+4. User-management-service 的 CORS 白名单要加上 `https://michellewang422-eng.github.io`。
+
+后端没开或隧道断开时，每个页面都会盖一层「演示服务器暂未开启」的说明（含项目链接和重试按钮），不会出现报错或空表单。本机用 `localhost` 打开时仍然连本机端口，行为不变。
+
 ### 数据库
 
 SQLite，文件是 `health-service/health.db`（已被 `.gitignore` 忽略），首次启动自动创建。`create_all` 只建新表、不改旧表：如果升级后报缺列（例如旧库没有 `sleep_hours`），删掉 `health.db` 重新启动即可（开发期数据可以丢）。内置食物在每次启动时幂等写入。
@@ -205,6 +216,17 @@ Typical flow: register → profile is created automatically → dashboard shows 
 The front end calls `http://127.0.0.1:8000` (user service) and `http://127.0.0.1:8001` (health-service); both are set at the top of `health-web/api.js`. The health-service CORS whitelist only allows pages opened from `localhost` / `127.0.0.1` on ports 8777 and 5500. If you change the front-end port, update `app/main.py` too.
 
 If the User-management-service's own web pages also run on port 8777, both sites share one `localStorage` (they both use the key `currentUser`). Use different ports, or open one via `localhost` and the other via `127.0.0.1`.
+
+### Public demo (GitHub Pages + local back end)
+
+The pages are hosted on GitHub Pages (always online); the back ends stay on your own computer and are exposed through tunnels:
+
+1. Repo Settings → Pages: source `main`, folder `/health-web` (or publish `health-web` with a GitHub Actions workflow).
+2. Start both back ends, then open one tunnel for each (for example Cloudflare Tunnel: `cloudflared tunnel --url http://127.0.0.1:8000` and `--url http://127.0.0.1:8001`) to get two https URLs.
+3. Put them into `PUBLIC_USER_API` / `PUBLIC_HEALTH_API` at the top of `health-web/api.js`, then commit and push.
+4. Add `https://michellewang422-eng.github.io` to the CORS whitelist of the User-management-service.
+
+When a back end is off or a tunnel is down, every page shows a "demo server is offline" notice (with the project link and a retry button) instead of errors or empty forms. Pages opened from `localhost` still use the local ports.
 
 ### Database
 

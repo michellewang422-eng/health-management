@@ -4,9 +4,75 @@
 // ============================================================
 
 // 前端和后端是三个独立的程序，前端靠下面两个地址找到它们。
-// 换端口 / 换机器，只改这两行。
-const USER_API = "http://127.0.0.1:8000";     // User-management-service：姓名、邮箱、登录
-const HEALTH_API = "http://127.0.0.1:8001";   // health-service：档案、打卡、标准
+// 本机打开（localhost / 127.0.0.1）用本机地址；放在 GitHub Pages 等公网地址上时，
+// 用 PUBLIC_* 里填的隧道地址（Cloudflare Tunnel / ngrok 给你的 https 地址，末尾不要加 /）。
+// PUBLIC_* 留空 = 还没有可用的后端，页面会直接显示「服务器暂未开启」。
+const PUBLIC_USER_API = "";     // 例：https://user-xxxx.trycloudflare.com
+const PUBLIC_HEALTH_API = "";   // 例：https://health-xxxx.trycloudflare.com
+const PROJECT_URL = "https://github.com/michellewang422-eng/health-management";
+
+const IS_LOCAL = ["localhost", "127.0.0.1", "[::1]", ""].includes(location.hostname);
+const USER_API = IS_LOCAL ? "http://127.0.0.1:8000" : PUBLIC_USER_API;      // User-management-service：姓名、邮箱、登录
+const HEALTH_API = IS_LOCAL ? "http://127.0.0.1:8001" : PUBLIC_HEALTH_API;  // health-service：档案、打卡、标准
+
+// ---------------- 「服务器暂未开启」提示层 ----------------
+// 演示服务器跑在作者自己的电脑上，不一定一直开着。后端连不上时，
+// 不让访客看到一个会报错的空表单，而是盖一层说明页（带项目链接和重试按钮）。
+let unavailableShown = false;
+
+function showUnavailable() {
+  if (unavailableShown || !document.body) return;
+  unavailableShown = true;
+  const box = document.createElement("div");
+  box.className = "unavailable";
+  box.setAttribute("role", "alert");
+  const card = document.createElement("div");
+  card.className = "unavailable-card";
+  const h = document.createElement("h2");
+  h.textContent = "演示服务器暂未开启";
+  const p1 = document.createElement("p");
+  p1.textContent = "这个健康管理网站的后端运行在作者自己的电脑上，目前没有开机或服务未启动，所以暂时无法使用。";
+  const p2 = document.createElement("p");
+  p2.textContent = "The back end of this demo runs on the author's own computer, which is offline right now. The site will work again once the server is started.";
+  const links = document.createElement("p");
+  const a = document.createElement("a");
+  a.href = PROJECT_URL;
+  a.textContent = "查看项目源码与截图 / View source and screenshots on GitHub";
+  a.target = "_blank";
+  a.rel = "noopener";
+  links.appendChild(a);
+  const btn = document.createElement("button");
+  btn.type = "button";
+  btn.className = "btn";
+  btn.textContent = "重试 / Retry";
+  btn.addEventListener("click", () => location.reload());
+  card.append(h, p1, p2, links, btn);
+  box.appendChild(card);
+  document.body.appendChild(box);
+}
+
+// 探测一个后端是否在线：3 秒内拿到响应就算在线。
+// 隧道断开时 Cloudflare 返回的错误页没有 CORS 头，浏览器会让 fetch 抛错，同样判为离线。
+async function isUp(base, path) {
+  if (!base) return false;
+  const ctl = new AbortController();
+  const timer = setTimeout(() => ctl.abort(), 3000);
+  try {
+    const r = await fetch(base + path, { signal: ctl.signal });
+    return r.status < 500;
+  } catch (e) {
+    return false;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+async function checkBackends() {
+  const [userUp, healthUp] = await Promise.all([isUp(USER_API, "/"), isUp(HEALTH_API, "/health")]);
+  if (!userUp || !healthUp) showUnavailable();
+}
+
+document.addEventListener("DOMContentLoaded", checkBackends);
 
 // FastAPI 的错误有两种形状：
 //   detail 是字符串（404 / 409 / 401 …）：{"detail": "邮箱未注册"}
@@ -27,6 +93,7 @@ async function request(base, path, options = {}) {
     });
   } catch (e) {
     // fetch 本身抛错 = 网络层出问题（后端没启动、被 CORS 拦住等），根本没拿到响应
+    showUnavailable();
     throw new Error("无法连接服务器，请确认后端已启动");
   }
   if (resp.status === 204) return null;                  // 204 = 成功但没有内容

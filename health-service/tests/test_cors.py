@@ -42,6 +42,12 @@ class CORSPreflightTestCase(unittest.TestCase):
         resp = self.preflight("PUT", origin="http://evil.example")
         self.assertIsNone(resp.headers.get("access-control-allow-origin"))
 
+    # ---- GitHub Pages 上的演示站：白名单内 ----
+    def test_preflight_from_github_pages_is_allowed(self):
+        origin = "https://michellewang422-eng.github.io"
+        resp = self.preflight("PUT", origin=origin)
+        self.assertEqual(resp.headers.get("access-control-allow-origin"), origin)
+
     # ---- 非浏览器的 client（curl / 其它 server）不带 Origin，照常工作 ----
     def test_request_without_origin_still_works(self):
         self.assertEqual(self.client.get("/health").status_code, 200)

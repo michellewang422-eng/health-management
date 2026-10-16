@@ -81,7 +81,7 @@ User-management-service 自带的网页如果也跑在 8777 端口，两个网�
 
 演示站的网页放在 GitHub Pages（一直在线），后端仍在你自己的电脑上，通过隧道对外：
 
-1. 仓库 Settings → Pages，Source 选 `main` 分支，目录选 `/health-web`（如目录不可选，可用 GitHub Actions 发布 `health-web`）。
+1. 仓库 Settings → Pages，Source 选 “GitHub Actions”；`.github/workflows/pages.yml` 会在每次推送到 `main` 时发布 `health-web`。
 2. 开机后启动两个后端，再各开一条隧道（例如 Cloudflare Tunnel：`cloudflared tunnel --url http://127.0.0.1:8000` 和 `--url http://127.0.0.1:8001`），得到两个 https 地址。
 3. 把这两个地址填进 `health-web/api.js` 的 `PUBLIC_USER_API` / `PUBLIC_HEALTH_API`，提交并推送。
 4. User-management-service 的 CORS 白名单要加上 `https://michellewang422-eng.github.io`。
@@ -221,7 +221,7 @@ If the User-management-service's own web pages also run on port 8777, both sites
 
 The pages are hosted on GitHub Pages (always online); the back ends stay on your own computer and are exposed through tunnels:
 
-1. Repo Settings → Pages: source `main`, folder `/health-web` (or publish `health-web` with a GitHub Actions workflow).
+1. Repo Settings → Pages: source "GitHub Actions"; `.github/workflows/pages.yml` publishes `health-web` on every push to `main`.
 2. Start both back ends, then open one tunnel for each (for example Cloudflare Tunnel: `cloudflared tunnel --url http://127.0.0.1:8000` and `--url http://127.0.0.1:8001`) to get two https URLs.
 3. Put them into `PUBLIC_USER_API` / `PUBLIC_HEALTH_API` at the top of `health-web/api.js`, then commit and push.
 4. Add `https://michellewang422-eng.github.io` to the CORS whitelist of the User-management-service.

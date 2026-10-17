@@ -6,16 +6,15 @@
 // 前端和后端是三个独立的程序，前端靠下面两个地址找到它们。
 // 只有从本机（localhost / 127.0.0.1）打开时才连本机后端；
 // 放在 GitHub Pages 等公网地址上时没有后端地址（空字符串），不会发出任何后端请求，
-// 页面直接显示「演示服务器暂未开启」。
+// 页面直接跳转到 index.html（项目介绍页：截图、演示 GIF、功能说明）。
 const PROJECT_URL = "https://github.com/michellewang422-eng/health-management";
 
 const IS_LOCAL = ["localhost", "127.0.0.1", "[::1]", ""].includes(location.hostname);
 const USER_API = IS_LOCAL ? "http://127.0.0.1:8000" : "";      // User-management-service：姓名、邮箱、登录
 const HEALTH_API = IS_LOCAL ? "http://127.0.0.1:8001" : "";    // health-service：档案、打卡、标准
 
-// ---------------- 「服务器暂未开启」提示层 ----------------
-// 演示服务器跑在作者自己的电脑上，不一定一直开着。后端连不上时，
-// 不让访客看到一个会报错的空表单，而是盖一层说明页（带项目链接和重试按钮）。
+// ---------------- 「后端未启动」提示层（只在本机使用时出现） ----------------
+// 本机打开页面但后端没启动时，不让用户看到一个会报错的空表单，而是盖一层说明。
 let unavailableShown = false;
 
 function showUnavailable() {
@@ -27,15 +26,15 @@ function showUnavailable() {
   const card = document.createElement("div");
   card.className = "unavailable-card";
   const h = document.createElement("h2");
-  h.textContent = "演示服务器暂未开启";
+  h.textContent = "后端服务未启动 / Back end is not running";
   const p1 = document.createElement("p");
-  p1.textContent = "这个健康管理网站的后端运行在作者自己的电脑上，目前没有开机或服务未启动，所以暂时无法使用。";
+  p1.textContent = "请先启动 User-management-service（8000）和 health-service（8001），步骤见 README。";
   const p2 = document.createElement("p");
-  p2.textContent = "The back end of this demo runs on the author's own computer, which is offline right now. The site will work again once the server is started.";
+  p2.textContent = "Start the User-management-service (8000) and the health-service (8001) as described in the README.";
   const links = document.createElement("p");
   const a = document.createElement("a");
   a.href = PROJECT_URL;
-  a.textContent = "查看项目源码与截图 / View source and screenshots on GitHub";
+  a.textContent = "README / GitHub";
   a.target = "_blank";
   a.rel = "noopener";
   links.appendChild(a);
@@ -50,7 +49,7 @@ function showUnavailable() {
 }
 
 // 探测一个后端是否在线：3 秒内拿到响应就算在线。
-// 地址为空（公网页面）、连不上、被 CORS 拦住，都判为离线。
+// 地址为空、连不上、被 CORS 拦住，都判为离线。
 async function isUp(base, path) {
   if (!base) return false;
   const ctl = new AbortController();
@@ -66,6 +65,8 @@ async function isUp(base, path) {
 }
 
 async function checkBackends() {
+  // 公网页面（GitHub Pages）没有后端：直接去介绍页
+  if (!IS_LOCAL) { location.replace("index.html"); return; }
   const [userUp, healthUp] = await Promise.all([isUp(USER_API, "/"), isUp(HEALTH_API, "/health")]);
   if (!userUp || !healthUp) showUnavailable();
 }

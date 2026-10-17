@@ -4,6 +4,8 @@
 
 一个中文的个人健康管理网站：建立健康档案，每天记录体重、运动、摄入热量和睡眠，系统按参考标准自动打分，并用曲线图展示一个周期内的变化；还带一个卡路里计算器。
 
+![演示 / Demo](health-web/img/demo.gif)
+
 > 这是学习项目。登录只输邮箱、没有密码，**不要放真实健康数据**；页面内容仅供学习参考，不能替代医生诊断。
 
 ## 功能
@@ -79,7 +81,7 @@ User-management-service 自带的网页如果也跑在 8777 端口，两个网�
 
 ### 公开演示页
 
-GitHub Pages 上的网页只是静态页面，不连接任何后端（包括你的电脑），打开后会显示「演示服务器暂未开启」说明页，并附上项目链接；要真正使用，请在本机按上文步骤启动服务。
+GitHub Pages 上的是项目介绍页（`health-web/index.html`）：演示 GIF、截图和功能说明，是纯静态页面，不连接任何后端。在非本机地址打开其它页面会自动跳转到介绍页；要真正使用，请在本机按上文步骤启动服务。
 
 ### 数据库
 
@@ -212,7 +214,7 @@ If the User-management-service's own web pages also run on port 8777, both sites
 
 ### Public demo page
 
-The page on GitHub Pages is static and connects to no back end (including your computer): it shows a "demo server is offline" notice with the project link. To actually use the app, start the services locally as described above.
+GitHub Pages hosts the project introduction page (`health-web/index.html`) with a demo GIF, screenshots and a feature overview. It is fully static and connects to no back end; opening any other page from a non-local address redirects to it. To actually use the app, start the services locally as described above.
 
 ### Database
 

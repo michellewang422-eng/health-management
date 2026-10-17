@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>健康管理 · 项目演示 / Health Management Demo</title>
+  <link rel="stylesheet" href="style.css">
+  <style>
+    .intro { max-width: 920px; margin: 0 auto; padding: 32px 16px 8px; }
+    .intro h1 { margin: 0 0 4px; }
+    .intro .sub { color: var(--muted); margin: 0 0 24px; }
+    .intro section { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 20px 24px; margin-bottom: 20px; }
+    .intro h2 { margin-top: 0; font-size: 1.15rem; }
+    .intro img { max-width: 100%; height: auto; border: 1px solid var(--border); border-radius: 8px; display: block; }
+    .intro figure { margin: 0 0 16px; }
+    .intro figcaption { color: var(--muted); font-size: 0.9rem; margin-top: 6px; }
+    .intro ul { padding-left: 1.2em; margin: 0; }
+    .intro .links a { margin-right: 16px; }
+    .intro pre { background: var(--bg); padding: 12px; border-radius: 8px; overflow-x: auto; }
+    .intro .en { color: var(--muted); }
+  </style>
+</head>
+<body>
+  <main class="intro">
+    <h1>健康管理 <span class="en">Health Management</span></h1>
+    <p class="sub">一个能根据年龄、性别和目标给出每日参考标准，并记录打卡、生成周期报告的网站。<br>
+      <span class="en">A web app that gives daily reference targets by age, gender and goal, tracks check-ins and builds cycle reports.</span></p>
+
+    <section>
+      <h2>演示 / Demo</h2>
+      <figure>
+        <img src="img/demo.gif" alt="演示动画：仪表盘、周期报告、卡路里计算器">
+        <figcaption>仪表盘 → 周期报告 → 卡路里计算器（演示数据）。 Dashboard → cycle report → calorie calculator (demo data).</figcaption>
+      </figure>
+    </section>
+
+    <section>
+      <h2>功能 / Features</h2>
+      <ul>
+        <li><b>每日参考标准</b>：热量、运动、BMI 与健康体重范围、睡眠、血糖、血压、胆固醇，并附依据来源。<br>
+          <span class="en">Daily targets for calories, exercise, BMI, sleep, glucose, blood pressure and cholesterol, with cited sources.</span></li>
+        <li><b>每日打卡与评分</b>：体重、运动、热量、睡眠四项，按目标判断「完成 / 超额 / 未完成」。<br>
+          <span class="en">Daily check-in scored on weight, exercise, calories and sleep.</span></li>
+        <li><b>周期报告</b>：汇总、完成率，以及体重 / 运动 / 热量 / 睡眠的 Chart.js 曲线（实际 vs 目标）。<br>
+          <span class="en">Cycle report with totals, completion rate and charts of actual vs target.</span></li>
+        <li><b>卡路里计算器</b>：输入食物和克数，支持别名与模糊匹配、候选下拉、歧义时让用户选择，结果可一键填入打卡。<br>
+          <span class="en">Calorie calculator with alias / fuzzy matching, suggestions, disambiguation, and one-click fill into the check-in.</span></li>
+      </ul>
+    </section>
+
+    <section>
+      <h2>截图 / Screenshots</h2>
+      <figure>
+        <img src="img/dashboard.jpg" alt="仪表盘：今日参考标准与每日打卡">
+        <figcaption>仪表盘：今日参考标准、每日打卡。 Dashboard: daily targets and check-in.</figcaption>
+      </figure>
+      <figure>
+        <img src="img/report.jpg" alt="周期报告：汇总与体重曲线">
+        <figcaption>周期报告：汇总与曲线。 Cycle report: totals and charts.</figcaption>
+      </figure>
+      <figure>
+        <img src="img/calculator-result.jpg" alt="卡路里计算器结果">
+        <figcaption>卡路里计算器：匹配结果与总热量。 Calorie calculator: matched foods and total.</figcaption>
+      </figure>
+    </section>
+
+    <section>
+      <h2>技术 / Tech</h2>
+      <ul>
+        <li>后端 Back end：FastAPI、SQLAlchemy、SQLite、Pydantic；评分和标准是纯函数，约 170 个自动化测试。</li>
+        <li>前端 Front end：原生 HTML / CSS / JavaScript，Chart.js。</li>
+        <li>两个独立服务：User-management-service（用户与登录）+ health-service（档案、打卡、报告、计算器）。</li>
+      </ul>
+    </section>
+
+    <section>
+      <h2>本机运行 / Run locally</h2>
+      <p>这是一个本机运行的学习项目，这个页面只是介绍，没有连接后端。完整步骤见 README。<br>
+        <span class="en">This is a learning project that runs locally; this page is a static introduction with no back end. See the README for setup.</span></p>
+      <p class="links">
+        <a href="https://github.com/michellewang422-eng/health-management" target="_blank" rel="noopener">GitHub 仓库 / Repository</a>
+        <a href="https://github.com/michellewang422-eng/health-management#readme" target="_blank" rel="noopener">README</a>
+      </p>
+    </section>
+  </main>
+  <footer class="site-footer">仅供学习参考，不能替代医生诊断。 For learning only; not medical advice.</footer>
+</body>
+</html>

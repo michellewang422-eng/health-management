@@ -26,8 +26,10 @@ def main():
     with httpx.Client(timeout=5) as c:
         try:
             r = c.post(f"{USER_API}/users", json={"email": email, "first_name": "Smoke", "last_name": "Test"})
-            assert r.status_code == 201, r.text
-            uid = r.json()["id"]
+            if r.is_success:
+                uid = r.json()["id"]          # 先记下 id：后面任何一步失败，finally 都能清理
+            # 用户服务创建成功返回 200（不是 201），所以两个都接受
+            assert r.status_code in (200, 201), r.text
             step("注册用户")
 
             r = c.post(f"{USER_API}/auth/login", json={"email": email})

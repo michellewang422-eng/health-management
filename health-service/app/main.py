@@ -43,7 +43,6 @@ app.add_middleware(
         "http://127.0.0.1:8777",
         "http://localhost:5500",
         "http://127.0.0.1:5500",
-        "https://michellewang422-eng.github.io",   # 放在 GitHub Pages 上的演示站
     ],
     allow_methods=["*"],   # 允许 GET/POST/PUT/DELETE/OPTIONS 等所有方法
     allow_headers=["*"],   # 允许所有请求头（比如 Content-Type）

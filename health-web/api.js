@@ -4,16 +4,14 @@
 // ============================================================
 
 // 前端和后端是三个独立的程序，前端靠下面两个地址找到它们。
-// 本机打开（localhost / 127.0.0.1）用本机地址；放在 GitHub Pages 等公网地址上时，
-// 用 PUBLIC_* 里填的隧道地址（Cloudflare Tunnel / ngrok 给你的 https 地址，末尾不要加 /）。
-// PUBLIC_* 留空 = 还没有可用的后端，页面会直接显示「服务器暂未开启」。
-const PUBLIC_USER_API = "";     // 例：https://user-xxxx.trycloudflare.com
-const PUBLIC_HEALTH_API = "";   // 例：https://health-xxxx.trycloudflare.com
+// 只有从本机（localhost / 127.0.0.1）打开时才连本机后端；
+// 放在 GitHub Pages 等公网地址上时没有后端地址（空字符串），不会发出任何后端请求，
+// 页面直接显示「演示服务器暂未开启」。
 const PROJECT_URL = "https://github.com/michellewang422-eng/health-management";
 
 const IS_LOCAL = ["localhost", "127.0.0.1", "[::1]", ""].includes(location.hostname);
-const USER_API = IS_LOCAL ? "http://127.0.0.1:8000" : PUBLIC_USER_API;      // User-management-service：姓名、邮箱、登录
-const HEALTH_API = IS_LOCAL ? "http://127.0.0.1:8001" : PUBLIC_HEALTH_API;  // health-service：档案、打卡、标准
+const USER_API = IS_LOCAL ? "http://127.0.0.1:8000" : "";      // User-management-service：姓名、邮箱、登录
+const HEALTH_API = IS_LOCAL ? "http://127.0.0.1:8001" : "";    // health-service：档案、打卡、标准
 
 // ---------------- 「服务器暂未开启」提示层 ----------------
 // 演示服务器跑在作者自己的电脑上，不一定一直开着。后端连不上时，
@@ -52,7 +50,7 @@ function showUnavailable() {
 }
 
 // 探测一个后端是否在线：3 秒内拿到响应就算在线。
-// 隧道断开时 Cloudflare 返回的错误页没有 CORS 头，浏览器会让 fetch 抛错，同样判为离线。
+// 地址为空（公网页面）、连不上、被 CORS 拦住，都判为离线。
 async function isUp(base, path) {
   if (!base) return false;
   const ctl = new AbortController();
